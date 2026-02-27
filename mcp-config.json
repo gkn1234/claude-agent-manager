@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "dispatch": {
+      "command": "pnpm",
+      "args": ["exec", "tsx", "src/mcp-server-stdio.ts"],
+      "env": {
+        "API_BASE": "http://localhost:3000"
+      }
+    }
+  }
+}

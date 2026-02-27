@@ -48,6 +48,12 @@ export async function runCommand(commandId: string): Promise<void> {
     // For now we include it in the prompt
   }
 
+  // Inject MCP config if available
+  const mcpConfigPath = join(process.cwd(), 'mcp-config.json');
+  if (existsSync(mcpConfigPath)) {
+    args.push('--mcp-config', mcpConfigPath);
+  }
+
   // Resume session if available
   const prevCommand = db.select()
     .from(commands)
@@ -123,6 +129,8 @@ export async function runCommand(commandId: string): Promise<void> {
   });
 
   child.on('close', (code) => {
+    clearTimeout(timer);
+    if (killTimer) clearTimeout(killTimer);
     logStream.end();
     runningProcesses.delete(commandId);
 
@@ -164,15 +172,13 @@ export async function runCommand(commandId: string): Promise<void> {
 
   // Timeout handler
   const timeout = parseInt(process.env.COMMAND_TIMEOUT || '1800') * 1000;
+  let killTimer: ReturnType<typeof setTimeout> | null = null;
   const timer = setTimeout(() => {
     if (runningProcesses.has(commandId)) {
       child.kill('SIGTERM');
-      setTimeout(() => {
+      killTimer = setTimeout(() => {
         try { child.kill('SIGKILL'); } catch {}
       }, 5000);
     }
   }, timeout);
-
-  // Clean up timer when process exits
-  child.on('close', () => clearTimeout(timer));
 }

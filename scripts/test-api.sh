@@ -1,6 +1,6 @@
 #!/bin/bash
 # Test script for the dispatch system API
-# Usage: Start the server with `npm run dev` first, then run this script
+# Usage: Start the server with `pnpm run dev` first, then run this script
 
 BASE_URL="${API_BASE:-http://localhost:3000}"
 

@@ -3,6 +3,13 @@ import { db } from '@/lib/db';
 import { commands } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
 
+const VALID_TRANSITIONS: Record<string, string[]> = {
+  pending: ['queued', 'aborted'],
+  queued: ['running', 'pending', 'aborted'],
+  running: ['completed', 'failed', 'aborted'],
+  // completed, failed, aborted are terminal states - no transitions allowed
+};
+
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const command = db.select().from(commands).where(eq(commands.id, id)).get();
@@ -16,6 +23,17 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (!command) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const updates = await req.json();
+
+  if (updates.status) {
+    const currentStatus = command.status || 'pending';
+    const allowed = VALID_TRANSITIONS[currentStatus];
+    if (!allowed || !allowed.includes(updates.status)) {
+      return NextResponse.json(
+        { error: `无法从 "${currentStatus}" 转换到 "${updates.status}"` },
+        { status: 400 }
+      );
+    }
+  }
 
   if (updates.status === 'aborted' && command.status === 'running' && command.pid) {
     try {
