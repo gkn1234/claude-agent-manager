@@ -40,7 +40,7 @@ export function CreateTaskDialog({ projectId, onCreated }: CreateTaskDialogProps
       <DialogTrigger asChild>
         <Button size="sm"><Plus className="mr-1 h-4 w-4" />新建任务</Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className="max-h-[80vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>新建任务</DialogTitle>
         </DialogHeader>
@@ -49,8 +49,9 @@ export function CreateTaskDialog({ projectId, onCreated }: CreateTaskDialogProps
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           rows={4}
+          className="min-h-[100px] max-h-[50vh] overflow-y-auto"
         />
-        <Button className="w-full" onClick={handleSubmit} disabled={loading || !description.trim()}>
+        <Button className="w-full shrink-0" onClick={handleSubmit} disabled={loading || !description.trim()}>
           {loading ? '创建中...' : '创建任务'}
         </Button>
       </DialogContent>

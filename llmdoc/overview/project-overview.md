@@ -46,7 +46,7 @@ Providers (named API credential profiles, sorted by sortOrder)
 
 **Scheduler Polling Loop:** `src/lib/scheduler.ts` (`tick`) polls DB every N seconds for `queued` commands, respects `max_concurrent` limit and per-task serial execution constraint. Lazily initialized on first HTTP request via `src/lib/init.ts`.
 
-**SSE Real-Time Updates:** `src/app/api/events/route.ts` maintains SSE connections, polls active commands every 2s, pushes change notifications. Client-side `src/hooks/use-commands.ts` receives SSE events then re-fetches full command list via REST for consistency.
+**SSE Real-Time Updates:** `src/app/api/events/route.ts` maintains SSE connections, polls active commands every 2s, pushes change notifications. Client-side `src/hooks/use-commands.ts` receives SSE events then re-fetches full command list (including `providerName`) via REST for consistency.
 
 **MCP Feedback Loop:** `src/mcp-server-stdio.ts` exposes 4 tools (`create_task`, `update_command`, `get_task_context`, `list_tasks`) to Claude subprocesses via stdio MCP. This enables Claude to self-decompose tasks, report progress, and query context.
 

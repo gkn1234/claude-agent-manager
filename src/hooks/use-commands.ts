@@ -17,6 +17,7 @@ export interface Command {
   taskDescription: string;
   projectId: string;
   projectName: string;
+  providerName: string | null;
 }
 
 export function useCommands(filters?: { projectId?: string; taskId?: string }) {
@@ -70,9 +71,11 @@ export function useCommands(filters?: { projectId?: string; taskId?: string }) {
   }, [fetchCommands]);
 
   const grouped = {
-    running: commands.filter(c => c.status === 'running'),
+    running: commands.filter(c => c.status === 'running')
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
     queued: commands.filter(c => c.status === 'queued' || c.status === 'pending'),
-    completed: commands.filter(c => ['completed', 'failed', 'aborted'].includes(c.status)),
+    completed: commands.filter(c => ['completed', 'failed', 'aborted'].includes(c.status))
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
   };
 
   return { commands, grouped, loading, abortCommand, reorderCommands, refetch: fetchCommands };

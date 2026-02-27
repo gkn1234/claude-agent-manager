@@ -6,7 +6,8 @@ import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowLeft, Send, Loader2, Play } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { ArrowLeft, Send, Loader2, Play, Trash2 } from 'lucide-react';
 
 interface Command {
   id: string;
@@ -158,6 +159,14 @@ export default function TaskPage() {
     }
   };
 
+  const handleDelete = async () => {
+    if (!confirm('确定要删除这个任务吗？将同时删除所有相关指令和日志。')) return;
+    const res = await fetch(`/api/tasks/${taskId}`, { method: 'DELETE' });
+    if (res.ok && task) {
+      router.push(`/projects/${task.projectId}`);
+    }
+  };
+
   if (loading) return <div className="flex h-[50vh] items-center justify-center text-muted-foreground">加载中...</div>;
   if (!task) return <div className="flex h-[50vh] items-center justify-center text-muted-foreground">任务不存在</div>;
 
@@ -171,8 +180,24 @@ export default function TaskPage() {
           </Button>
           <Badge variant="outline">{taskStatusMap[task.status] || task.status}</Badge>
           {task.branch && <span className="text-xs text-muted-foreground">{task.branch}</span>}
+          <div className="flex-1" />
+          <Button variant="ghost" size="sm" className="p-1 text-destructive hover:text-destructive" onClick={handleDelete}>
+            <Trash2 className="h-4 w-4" />
+          </Button>
         </div>
-        <p className="text-sm">{task.description}</p>
+        <Dialog>
+          <DialogTrigger asChild>
+            <p className="text-sm truncate cursor-pointer hover:text-foreground/80 transition-colors">{task.description}</p>
+          </DialogTrigger>
+          <DialogContent className="max-h-[80vh] flex flex-col">
+            <DialogHeader>
+              <DialogTitle>任务描述</DialogTitle>
+            </DialogHeader>
+            <div className="overflow-y-auto whitespace-pre-wrap text-sm">
+              {task.description}
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
 
       {/* Command Timeline */}

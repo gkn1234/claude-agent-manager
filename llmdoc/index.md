@@ -13,8 +13,8 @@ Entry point for LLM agents navigating the Claude Dispatch documentation. Read do
 | Document | Description |
 |---|---|
 | [projects-architecture](architecture/projects-architecture.md) | How the Projects entity works: schema, API routes, git utilities, three creation modes (clone, new, local), and cascade deletion via `cleanupTask()`. |
-| [tasks-architecture](architecture/tasks-architecture.md) | How Tasks provide git worktree isolation and a manual-trigger init pipeline (pending -> init -> research -> ready). Covers status gating, provider requirement, cleanup logic, and configurable prompts. |
-| [commands-scheduler-architecture](architecture/commands-scheduler-architecture.md) | The command execution pipeline: priority-based scheduling, concurrency control, mode-based CLI flags (`--permission-mode plan`), provider env injection, execEnv audit, and runner post-processing. |
+| [tasks-architecture](architecture/tasks-architecture.md) | How Tasks provide git worktree isolation and a manual-trigger init pipeline (pending -> init -> research -> ready). Covers status gating, provider requirement, cleanup logic, configurable prompts, task detail page (delete button, description truncate+dialog), and create-task dialog long content support. |
+| [commands-scheduler-architecture](architecture/commands-scheduler-architecture.md) | The command execution pipeline: priority-based scheduling, concurrency control, mode-based CLI flags (`--permission-mode plan`), provider env injection, execEnv audit, permission_denials extraction (AskUserQuestion -> markdown), runner post-processing, providerName in command list, three-section detail page layout with sticky input, and inline command input from the detail page. |
 | [providers-architecture](architecture/providers-architecture.md) | Provider profiles: named configurations with free-form env key-value pairs, CRUD API, drag-and-drop reordering, runtime env injection, and sensitive value masking. |
 | [mcp-feedback-loop](architecture/mcp-feedback-loop.md) | Bidirectional MCP bridge between Claude subprocesses and the app. Covers the 4 MCP tools (create_task, update_command, get_task_context, list_tasks) and how recursive task decomposition works. |
 
@@ -23,8 +23,8 @@ Entry point for LLM agents navigating the Claude Dispatch documentation. Read do
 | Document | Description |
 |---|---|
 | [managing-projects](guides/managing-projects.md) | How to create, list, retrieve, and delete projects via the REST API. Deletion now uses `cleanupTask()` for full cleanup. |
-| [working-with-tasks](guides/working-with-tasks.md) | Task lifecycle: creation (pending), manual init with provider, two-phase pipeline, follow-up commands, monitoring, and deletion. Provider is required for all operations. |
-| [dispatching-commands](guides/dispatching-commands.md) | Full command lifecycle: create (with provider), queue, execute, monitor, view execEnv, reorder priority, and abort. |
+| [working-with-tasks](guides/working-with-tasks.md) | Task lifecycle: creation (pending), manual init with provider, two-phase pipeline, follow-up commands, monitoring (description truncate+dialog), and deletion (UI delete button with confirm, redirect to project). Provider is required for all operations. |
+| [dispatching-commands](guides/dispatching-commands.md) | Full command lifecycle: create (with provider), queue, execute, monitor, view execEnv, dispatch follow-up from detail page (navigates to task page), reorder priority, and abort. |
 | [mcp-integration](guides/mcp-integration.md) | How to configure, extend, and debug the MCP integration (adding new tools, setting API_BASE, reading logs). |
 
 ## Reference

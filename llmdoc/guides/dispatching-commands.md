@@ -12,8 +12,10 @@ A guide for dispatching commands through the system's lifecycle, from creation t
 
 5. **Monitor command status:** Use `GET /api/commands?status=running` for filtered lists, `GET /api/commands/[id]` for single command detail, or `GET /api/commands/[id]/logs` to read the NDJSON execution log. For real-time updates, connect to `GET /api/events` (SSE stream). Reference: `/llmdoc/architecture/commands-scheduler-architecture.md`.
 
-6. **View execution environment:** On the command detail page (`/commands/[id]`), expand the "execEnv" collapsible section to see provider name, working directory, CLI arguments, and sanitized environment variables used for that command. Reference: `src/app/commands/[id]/page.tsx:129-173`.
+6. **View execution environment:** On the command detail page (`/commands/[id]`), expand the "execEnv" collapsible section to see provider name, working directory, CLI arguments, and sanitized environment variables used for that command. Reference: `src/app/commands/[id]/page.tsx:214-258`.
 
-7. **Abort a running command:** Send `PATCH /api/commands/[id]` with `{ status: "aborted" }`. If the command is running, the system sends SIGTERM to the claude process, followed by SIGKILL after 5 seconds. Works from `pending`, `queued`, or `running` states. Reference: `src/app/api/commands/[id]/route.ts:38-45`.
+7. **Dispatch follow-up from command detail page:** When viewing a finished command that is the latest terminal non-init command in a `ready` task with no running/queued commands, an inline input area appears at the sticky bottom of the page (three-section flex layout). Select a provider, choose Exec/Plan mode, type a prompt, and submit. The page navigates back to the task page. Provider/mode preferences are saved to the task. Reference: `src/app/commands/[id]/page.tsx:298-354`, `/llmdoc/architecture/commands-scheduler-architecture.md` (section 3e).
 
-8. **Verify:** Check `GET /api/system/status` to see current running process count, max concurrency, available slots, and active PIDs. Reference: `src/app/api/system/status/route.ts`.
+8. **Abort a running command:** Send `PATCH /api/commands/[id]` with `{ status: "aborted" }`. If the command is running, the system sends SIGTERM to the claude process, followed by SIGKILL after 5 seconds. Works from `pending`, `queued`, or `running` states. Reference: `src/app/api/commands/[id]/route.ts:81-88`.
+
+9. **Verify:** Check `GET /api/system/status` to see current running process count, max concurrency, available slots, and active PIDs. Reference: `src/app/api/system/status/route.ts`.

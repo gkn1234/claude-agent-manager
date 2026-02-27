@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Square, GripVertical } from 'lucide-react';
+import { useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import type { Command } from '@/hooks/use-commands';
 
 const statusConfig: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
@@ -32,14 +34,16 @@ interface CommandCardProps {
   draggable?: boolean;
 }
 
-export function CommandCard({ command, onAbort, draggable }: CommandCardProps) {
+function CommandCardInner({ command, onAbort, dragHandle }: {
+  command: Command;
+  onAbort?: (id: string) => void;
+  dragHandle?: React.ReactNode;
+}) {
   const config = statusConfig[command.status] || statusConfig.pending;
 
   return (
-    <div className="flex items-start gap-2 rounded-lg border p-3 bg-card">
-      {draggable && (
-        <GripVertical className="mt-1 h-4 w-4 shrink-0 cursor-grab text-muted-foreground" />
-      )}
+    <>
+      {dragHandle}
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1 text-sm text-muted-foreground min-w-0">
           <Link
@@ -73,6 +77,9 @@ export function CommandCard({ command, onAbort, draggable }: CommandCardProps) {
             {command.mode === 'research' && (
               <Badge variant="outline">调研</Badge>
             )}
+            {command.providerName && (
+              <span className="text-xs text-muted-foreground">{command.providerName}</span>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground">
@@ -92,6 +99,51 @@ export function CommandCard({ command, onAbort, draggable }: CommandCardProps) {
           </div>
         </div>
       </div>
+    </>
+  );
+}
+
+function SortableCommandCard({ command, onAbort }: { command: Command; onAbort?: (id: string) => void }) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: command.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} className="flex items-start gap-2 rounded-lg border p-3 bg-card">
+      <CommandCardInner
+        command={command}
+        onAbort={onAbort}
+        dragHandle={
+          <GripVertical
+            className="mt-1 h-4 w-4 shrink-0 cursor-grab text-muted-foreground"
+            {...attributes}
+            {...listeners}
+          />
+        }
+      />
+    </div>
+  );
+}
+
+export function CommandCard({ command, onAbort, draggable }: CommandCardProps) {
+  if (draggable) {
+    return <SortableCommandCard command={command} onAbort={onAbort} />;
+  }
+
+  return (
+    <div className="flex items-start gap-2 rounded-lg border p-3 bg-card">
+      <CommandCardInner command={command} onAbort={onAbort} />
     </div>
   );
 }

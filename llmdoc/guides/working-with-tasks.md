@@ -12,9 +12,9 @@ A task represents an isolated unit of work within a project. Each task gets its 
 
 4. **Add follow-up commands:** `POST /api/tasks/{taskId}/commands` with `{ "prompt": "...", "mode": "execute"|"plan", "providerId": "..." }`. Provider is required. Commands execute serially -- the API rejects requests if a command is already running (409). See `src/app/api/tasks/[id]/commands/route.ts`.
 
-5. **Monitor task state:** `GET /api/tasks/{taskId}` returns the task with all its commands. The frontend task page (`src/app/tasks/[id]/page.tsx`) polls every 5 seconds.
+5. **Monitor task state:** `GET /api/tasks/{taskId}` returns the task with all its commands. The frontend task page (`src/app/tasks/[id]/page.tsx`) polls every 5 seconds. Task description is shown truncated in the header; click to open a scrollable Dialog with full text.
 
-6. **Delete a task:** `DELETE /api/tasks/{taskId}` calls `cleanupTask()` which kills running processes, deletes log files, removes the git worktree, and cascade-deletes all DB records. See `src/lib/claude-runner.ts:23-53`.
+6. **Delete a task:** Click the red Trash2 button in the task detail page header, or call `DELETE /api/tasks/{taskId}`. UI confirms via `confirm()` dialog, then calls `cleanupTask()` which kills running processes, deletes log files, removes the git worktree, and cascade-deletes all DB records. On success, redirects to the project page. See `src/app/tasks/[id]/page.tsx:162-168` and `src/lib/claude-runner.ts:23-53`.
 
 ## Key Concepts
 

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { commands } from '@/lib/schema';
-import { eq } from 'drizzle-orm';
+import { commands, tasks } from '@/lib/schema';
+import { eq, and, inArray, not, desc } from 'drizzle-orm';
 
 const VALID_TRANSITIONS: Record<string, string[]> = {
   pending: ['queued', 'aborted'],
@@ -14,7 +14,50 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const { id } = await params;
   const command = db.select().from(commands).where(eq(commands.id, id)).get();
   if (!command) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-  return NextResponse.json(command);
+
+  // Fetch task context for the command input area
+  const task = db.select().from(tasks).where(eq(tasks.id, command.taskId)).get();
+
+  let isLatestFinished = false;
+  let hasRunning = false;
+
+  if (task) {
+    // Check if there's a running command for this task
+    const runningCmd = db.select({ id: commands.id })
+      .from(commands)
+      .where(and(
+        eq(commands.taskId, command.taskId),
+        inArray(commands.status, ['running', 'queued']),
+      ))
+      .limit(1)
+      .get();
+    hasRunning = !!runningCmd;
+
+    // Check if this command is the latest finished non-init command
+    const terminalStatuses = ['completed', 'failed', 'aborted'];
+    if (command.status && terminalStatuses.includes(command.status) && command.mode !== 'init') {
+      const latest = db.select({ id: commands.id })
+        .from(commands)
+        .where(and(
+          eq(commands.taskId, command.taskId),
+          inArray(commands.status, terminalStatuses),
+          not(eq(commands.mode, 'init')),
+        ))
+        .orderBy(desc(commands.createdAt))
+        .limit(1)
+        .get();
+      isLatestFinished = latest?.id === command.id;
+    }
+  }
+
+  return NextResponse.json({
+    ...command,
+    taskStatus: task?.status ?? null,
+    taskLastProviderId: task?.lastProviderId ?? null,
+    taskLastMode: task?.lastMode ?? null,
+    isLatestFinished,
+    hasRunning,
+  });
 }
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {

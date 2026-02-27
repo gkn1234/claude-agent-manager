@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { commands, tasks, projects } from '@/lib/schema';
-import { desc, asc, eq } from 'drizzle-orm';
+import { commands, tasks, projects, providers } from '@/lib/schema';
+import { asc, desc, eq } from 'drizzle-orm';
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -23,10 +23,12 @@ export async function GET(req: Request) {
     taskDescription: tasks.description,
     projectId: tasks.projectId,
     projectName: projects.name,
+    providerName: providers.name,
   })
   .from(commands)
   .innerJoin(tasks, eq(commands.taskId, tasks.id))
   .innerJoin(projects, eq(tasks.projectId, projects.id))
+  .leftJoin(providers, eq(commands.providerId, providers.id))
   .orderBy(desc(commands.priority), asc(commands.createdAt))
   .all();
 

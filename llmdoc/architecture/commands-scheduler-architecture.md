@@ -9,14 +9,16 @@
 
 - `src/lib/schema.ts` (`commands`): Defines the `commands` SQLite table -- id, taskId, prompt, mode, status, priority, providerId, result, logFile, execEnv, sessionId, pid, startedAt, finishedAt, createdAt.
 - `src/lib/scheduler.ts` (`startScheduler`, `stopScheduler`, `tick`, `recoverOrphanedCommands`): Polling-based scheduler. Reads queued commands from DB each tick, enforces per-task serial execution and global concurrency limit, dispatches to runner.
-- `src/lib/claude-runner.ts` (`runCommand`, `cleanupTask`, `runningProcesses`, `RunningProcess`): Spawns `claude` CLI as child process with provider env injection, parses NDJSON stdout stream for session_id/result, handles timeout, records `execEnv` audit blob, writes terminal state back to DB. Performs post-processing for init and research commands.
+- `src/lib/claude-runner.ts` (`runCommand`, `cleanupTask`, `runningProcesses`, `RunningProcess`): Spawns `claude` CLI as child process with provider env injection, parses NDJSON stdout stream for session_id/result/permission_denials, handles timeout, records `execEnv` audit blob, writes terminal state back to DB. Extracts `AskUserQuestion` permission denials from result events and appends them as formatted markdown to command result. Performs post-processing for init and research commands.
 - `src/lib/init.ts` (`ensureInitialized`): Lazy singleton guard; starts the scheduler on first HTTP request.
 - `src/lib/config.ts` (`getConfig`, `CONFIG_KEYS`): Reads `max_concurrent`, `command_timeout`, `poll_interval`, `init_prompt`, `research_prompt` from DB config table with defaults.
-- `src/app/api/commands/[id]/route.ts` (`PATCH`): Enforces state machine transitions via `VALID_TRANSITIONS` map. Handles abort by sending SIGTERM/SIGKILL.
+- `src/app/api/commands/[id]/route.ts` (`GET`, `PATCH`): GET returns command detail enriched with task context fields (`taskStatus`, `taskLastProviderId`, `taskLastMode`, `isLatestFinished`, `hasRunning`) for the inline command input area. PATCH enforces state machine transitions via `VALID_TRANSITIONS` map. Handles abort by sending SIGTERM/SIGKILL.
 - `src/app/api/tasks/[id]/commands/route.ts` (`POST`): Creates commands. Requires `providerId`. Rejects if task not `ready` (403) or has running command (409). Supports `autoQueue` flag.
 - `src/app/api/commands/reorder/route.ts` (`PATCH`): Batch-updates priority field for multiple commands.
-- `src/app/api/commands/route.ts` (`GET`): Lists commands with JOIN to tasks+projects, filtered by status/project_id/task_id.
+- `src/app/api/commands/route.ts` (`GET`): Lists commands with JOIN to tasks+projects, leftJoin to providers. Returns `providerName` field. Filtered by status/project_id/task_id.
 - `src/app/api/commands/[id]/logs/route.ts` (`GET`): Reads NDJSON log file from filesystem.
+- `src/app/commands/[id]/page.tsx` (`CommandDetailPage`): Command detail UI with three-section flex layout: sticky header, scrollable content, and sticky bottom input area. When `isLatestFinished && taskStatus === 'ready' && !hasRunning`, renders an inline command input area at the bottom with provider select, exec/plan mode toggle, textarea, and send button. Submits to `POST /api/tasks/[taskId]/commands` and navigates back to the task page.
+- `src/components/commands/command-card.tsx` (`CommandCard`, `CommandCardInner`): Renders command card in queue list. Displays `providerName` (from leftJoin) as muted text next to status/mode badges.
 
 ## 3. Execution Flow (LLM Retrieval Map)
 
@@ -50,10 +52,19 @@ The `mode` field on commands supports four values:
 - **2.** Builds CLI args. Appends `--permission-mode plan` for `mode='plan'` or `mode='research'` -- `src/lib/claude-runner.ts:83-85`.
 - **3.** Session resumption: finds most recent command with sessionId, **skipping `mode='init'` and `mode='research'` commands** -- `src/lib/claude-runner.ts:94-100`.
 - **4.** Spawns `claude` subprocess with provider env, updates command to status=running -- `src/lib/claude-runner.ts:152-174`.
-- **5.** Parses NDJSON stdout for `session_id` and `result` -- `src/lib/claude-runner.ts:184-206`.
-- **6.** On close: writes terminal state. Then runs mode-specific post-processing.
+- **5.** Parses NDJSON stdout for `session_id`, `result`, and `permission_denials` -- `src/lib/claude-runner.ts:184-214`.
+- **6.** On close: writes terminal state. Filters `AskUserQuestion` denials and appends formatted markdown questions/options to result -- `src/lib/claude-runner.ts:233-253`. Then runs mode-specific post-processing.
 
-### 3e. Abort Flow
+### 3e. Inline Command Input (Command Detail Page)
+
+- **1.** `GET /api/commands/[id]` at `src/app/api/commands/[id]/route.ts:13-61`: returns command fields plus derived context: `taskStatus`, `taskLastProviderId`, `taskLastMode`, `isLatestFinished`, `hasRunning`.
+- **2.** `isLatestFinished`: true when this command is the most recent terminal (completed/failed/aborted) non-init command in its task -- `src/app/api/commands/[id]/route.ts:37-50`.
+- **3.** `hasRunning`: true when the task has any running or queued command -- `src/app/api/commands/[id]/route.ts:26-34`.
+- **4.** Page renders input area when `isLatestFinished && taskStatus === 'ready' && !hasRunning` -- `src/app/commands/[id]/page.tsx:158-161`.
+- **5.** Provider/mode changes save preferences to task via `PATCH /api/tasks/[taskId]` -- `src/app/commands/[id]/page.tsx:139-156`.
+- **6.** Submit creates command via `POST /api/tasks/[taskId]/commands`, then navigates back to the task page (`/tasks/[taskId]`) -- `src/app/commands/[id]/page.tsx:163-178`.
+
+### 3f. Abort Flow
 
 - **1.** `PATCH /api/commands/[id]` with `{ status: 'aborted' }` at `src/app/api/commands/[id]/route.ts`.
 - **2.** Validates transition via `VALID_TRANSITIONS` map.

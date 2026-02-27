@@ -12,9 +12,10 @@
 - `src/app/api/tasks/[id]/init/route.ts` (`POST`): Manual init trigger. Requires `providerId`. Transitions task `pending -> initializing`, creates `mode='init'` command with provider.
 - `src/app/api/tasks/route.ts` (`GET`): Lists tasks, supports `?project_id=` filtering.
 - `src/app/api/tasks/[id]/route.ts` (`GET`, `PATCH`, `DELETE`): Retrieves task with commands; updates `lastProviderId`/`lastMode` preferences; deletes task via `cleanupTask()`.
-- `src/app/api/tasks/[id]/commands/route.ts` (`POST`): Adds a command to a task. Requires `providerId`. Rejects with 403 if task status is not `ready`; rejects with 409 if a running command exists.
+- `src/app/tasks/[id]/page.tsx` (`TaskPage`): Task detail UI with three-section flex layout (sticky header, scrollable command timeline, sticky bottom input). Header includes delete button (Trash2 icon, confirm dialog, redirects to project page). Task description is truncated with click-to-expand Dialog (`max-h-[80vh]`, scrollable).- `src/app/api/tasks/[id]/commands/route.ts` (`POST`): Adds a command to a task. Requires `providerId`. Rejects with 403 if task status is not `ready`; rejects with 409 if a running command exists.
 - `src/lib/scheduler.ts` (`tick`): Polls queued commands. Enforces per-task serial execution by skipping tasks that have a running command.
 - `src/lib/claude-runner.ts` (`runCommand`, `cleanupTask`): Spawns `claude` CLI in the task's `worktreeDir` with provider env injection. On init success: scans for worktree dir (creation-time sorted, excludes dirs assigned to other tasks), sets status to `researching`, creates research command. On research success: promotes task to `ready`. `cleanupTask` handles full cleanup (kill processes, delete logs, remove worktree, delete DB records).
+- `src/components/projects/create-task-dialog.tsx` (`CreateTaskDialog`): Dialog for creating tasks. DialogContent uses `max-h-[80vh] flex flex-col`; Textarea uses `max-h-[50vh] overflow-y-auto` to handle long descriptions without overflowing.
 - `src/lib/config.ts` (`getConfig`, `CONFIG_DEFAULTS`): Provides `init_prompt` and `research_prompt` templates with placeholder substitution.
 
 ## 3. Execution Flow (LLM Retrieval Map)
@@ -47,8 +48,10 @@
 
 ### Task Deletion (Cleanup)
 
-- **1. API Request:** `DELETE /api/tasks/{id}` -- `src/app/api/tasks/[id]/route.ts:31-38`.
-- **2. `cleanupTask()`:** `src/lib/claude-runner.ts:23-53` performs: kill running processes (SIGTERM+SIGKILL), delete log files, remove git worktree (`git worktree remove --force`), delete commands and task DB records.
+- **1. UI Trigger:** Task detail page header has a red delete button (Trash2 icon). Click triggers `confirm()` dialog -- `src/app/tasks/[id]/page.tsx:162-168`.
+- **2. API Request:** `DELETE /api/tasks/{id}` -- `src/app/api/tasks/[id]/route.ts:31-38`.
+- **3. `cleanupTask()`:** `src/lib/claude-runner.ts:23-53` performs: kill running processes (SIGTERM+SIGKILL), delete log files, remove git worktree (`git worktree remove --force`), delete commands and task DB records.
+- **4. Redirect:** On success, navigates to the parent project page (`/projects/{projectId}`).
 
 ### Task State Machine
 

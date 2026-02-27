@@ -90,17 +90,19 @@ export async function runCommand(commandId: string): Promise<void> {
     args.push('--mcp-config', mcpConfigPath);
   }
 
-  // Resume session if available (skip init/research commands for session isolation)
-  const prevCommand = db.select()
-    .from(commands)
-    .where(eq(commands.taskId, command.taskId))
-    .all()
-    .filter(c => c.sessionId && c.id !== commandId && c.mode !== 'init' && c.mode !== 'research')
-    .sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''))
-    .pop();
+  // Resume session if available (only for execute/plan commands, not init/research)
+  if (command.mode !== 'init' && command.mode !== 'research') {
+    const prevCommand = db.select()
+      .from(commands)
+      .where(eq(commands.taskId, command.taskId))
+      .all()
+      .filter(c => c.sessionId && c.id !== commandId && c.mode !== 'init')
+      .sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''))
+      .pop();
 
-  if (prevCommand?.sessionId) {
-    args.push('--resume', prevCommand.sessionId);
+    if (prevCommand?.sessionId) {
+      args.push('--resume', prevCommand.sessionId);
+    }
   }
 
   // Build spawn environment with provider injection
@@ -178,6 +180,7 @@ export async function runCommand(commandId: string): Promise<void> {
   let lastResult = '';
   let sessionId = '';
   let stderr = '';
+  let permissionDenials: Array<{ tool_name: string; tool_input: Record<string, unknown> }> = [];
 
   // Parse stream-json output line by line
   let buffer = '';
@@ -198,6 +201,11 @@ export async function runCommand(commandId: string): Promise<void> {
         if (event.type === 'result') {
           lastResult = event.result || '';
           sessionId = event.session_id || sessionId;
+          console.log(`[claude-runner] cmd=${commandId} result event received, result_length=${lastResult.length}, permission_denials=${JSON.stringify(event.permission_denials?.length ?? 0)}`);
+          if (event.permission_denials?.length) {
+            permissionDenials = event.permission_denials;
+            console.log(`[claude-runner] cmd=${commandId} permission_denials tools: ${event.permission_denials.map((d: { tool_name: string }) => d.tool_name).join(', ')}`);
+          }
         }
       } catch {
         // Not valid JSON, skip
@@ -215,10 +223,34 @@ export async function runCommand(commandId: string): Promise<void> {
     logStream.end();
     runningProcesses.delete(commandId);
 
+    console.log(`[claude-runner] cmd=${commandId} process closed, code=${code}, lastResult_length=${lastResult.length}, permissionDenials_count=${permissionDenials.length}`);
+
     const finalStatus = code === 0 ? 'completed' : 'failed';
-    const result = code === 0
+    let result = code === 0
       ? lastResult || 'Command completed'
       : `Exit code: ${code}\n${stderr}`.trim();
+
+    // Append AskUserQuestion permission denials as markdown
+    const questionDenials = permissionDenials.filter(d => d.tool_name === 'AskUserQuestion');
+    console.log(`[claude-runner] cmd=${commandId} questionDenials_count=${questionDenials.length}`);
+    if (questionDenials.length > 0) {
+      const parts: string[] = [];
+      for (const denial of questionDenials) {
+        const input = denial.tool_input as { questions?: Array<{ question: string; header?: string; options?: Array<{ label: string; description?: string }>; multiSelect?: boolean }> };
+        if (!input.questions?.length) continue;
+        for (const q of input.questions) {
+          parts.push(`\n### ${q.header || '问题'}\n\n**${q.question}**${q.multiSelect ? '（可多选）' : ''}\n`);
+          if (q.options?.length) {
+            for (const opt of q.options) {
+              parts.push(`- **${opt.label}**${opt.description ? ` — ${opt.description}` : ''}`);
+            }
+          }
+        }
+      }
+      if (parts.length > 0) {
+        result += '\n\n---\n\n> 以下问题需要你的回复：\n' + parts.join('\n');
+      }
+    }
 
     db.update(commands).set({
       status: finalStatus,
