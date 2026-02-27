@@ -1,0 +1,81 @@
+import { db } from './db';
+import { commands } from './schema';
+import { eq, and, asc, desc } from 'drizzle-orm';
+import { runCommand, runningProcesses } from './claude-runner';
+
+const MAX_CONCURRENT = parseInt(process.env.MAX_CONCURRENT || '2');
+const POLL_INTERVAL = parseInt(process.env.POLL_INTERVAL || '5') * 1000;
+
+let schedulerTimer: ReturnType<typeof setInterval> | null = null;
+
+export function startScheduler() {
+  if (schedulerTimer) return;
+
+  recoverOrphanedCommands();
+
+  schedulerTimer = setInterval(tick, POLL_INTERVAL);
+  console.log(`[Scheduler] Started, max_concurrent=${MAX_CONCURRENT}, poll_interval=${POLL_INTERVAL}ms`);
+
+  tick();
+}
+
+export function stopScheduler() {
+  if (schedulerTimer) {
+    clearInterval(schedulerTimer);
+    schedulerTimer = null;
+  }
+}
+
+function tick() {
+  const runningCount = runningProcesses.size;
+  if (runningCount >= MAX_CONCURRENT) return;
+
+  const slotsAvailable = MAX_CONCURRENT - runningCount;
+
+  const queued = db.select()
+    .from(commands)
+    .where(eq(commands.status, 'queued'))
+    .orderBy(desc(commands.priority), asc(commands.createdAt))
+    .limit(slotsAvailable)
+    .all();
+
+  for (const cmd of queued) {
+    const taskRunning = db.select()
+      .from(commands)
+      .where(and(eq(commands.taskId, cmd.taskId), eq(commands.status, 'running')))
+      .get();
+
+    if (taskRunning) continue;
+
+    runCommand(cmd.id).catch(err => {
+      console.error(`[Scheduler] Failed to run command ${cmd.id}:`, err);
+    });
+  }
+}
+
+function recoverOrphanedCommands() {
+  const orphaned = db.select()
+    .from(commands)
+    .where(eq(commands.status, 'running'))
+    .all();
+
+  for (const cmd of orphaned) {
+    if (cmd.pid) {
+      try {
+        process.kill(cmd.pid, 0);
+        process.kill(cmd.pid, 'SIGTERM');
+      } catch {}
+    }
+
+    db.update(commands).set({
+      status: 'failed',
+      result: '服务重启导致中断',
+      pid: null,
+      finishedAt: new Date().toISOString(),
+    }).where(eq(commands.id, cmd.id)).run();
+  }
+
+  if (orphaned.length > 0) {
+    console.log(`[Scheduler] Recovered ${orphaned.length} orphaned command(s)`);
+  }
+}
