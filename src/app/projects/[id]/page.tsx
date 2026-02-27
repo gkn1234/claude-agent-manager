@@ -28,6 +28,7 @@ interface Project {
 
 const taskStatusConfig: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
   initializing: { label: '初始化中', variant: 'secondary' },
+  researching: { label: '调研中', variant: 'secondary' },
   ready: { label: '就绪', variant: 'default' },
   archived: { label: '已归档', variant: 'outline' },
 };
@@ -55,6 +56,14 @@ export default function ProjectDetailPage() {
     if (!confirm('确定删除此项目？所有任务和指令将一并删除。')) return;
     await fetch(`/api/projects/${projectId}`, { method: 'DELETE' });
     router.push('/projects');
+  };
+
+  const handleDeleteTask = async (taskId: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!confirm('确定删除此任务？所有指令将一并删除。')) return;
+    await fetch(`/api/tasks/${taskId}`, { method: 'DELETE' });
+    fetchProject();
   };
 
   if (loading) return <div className="flex h-[50vh] items-center justify-center text-muted-foreground">加载中...</div>;
@@ -95,8 +104,18 @@ export default function ProjectDetailPage() {
                 <Card className="hover:bg-accent/50 transition-colors">
                   <CardHeader className="py-3 px-4">
                     <div className="flex items-center justify-between">
-                      <CardTitle className="text-sm">{task.description.slice(0, 60)}</CardTitle>
-                      <Badge variant={config.variant}>{config.label}</Badge>
+                      <CardTitle className="text-sm flex-1">{task.description.slice(0, 60)}</CardTitle>
+                      <div className="flex items-center gap-1">
+                        <Badge variant={config.variant}>{config.label}</Badge>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+                          onClick={(e) => handleDeleteTask(task.id, e)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
                     </div>
                     {task.branch && (
                       <CardDescription className="text-xs">{task.branch}</CardDescription>

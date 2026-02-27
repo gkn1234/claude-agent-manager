@@ -4,7 +4,8 @@ import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { FolderGit2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { FolderGit2, Trash2 } from 'lucide-react';
 import { CreateProjectDialog } from '@/components/projects/create-project-dialog';
 
 interface Project {
@@ -30,6 +31,14 @@ export default function ProjectsPage() {
 
   useEffect(() => { fetchProjects(); }, [fetchProjects]);
 
+  const handleDelete = async (projectId: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!confirm('确定删除此项目？所有任务和指令将一并删除。')) return;
+    await fetch(`/api/projects/${projectId}`, { method: 'DELETE' });
+    fetchProjects();
+  };
+
   return (
     <div className="mx-auto max-w-2xl px-4 py-4">
       <div className="flex items-center justify-between mb-4">
@@ -50,7 +59,17 @@ export default function ProjectsPage() {
             <Link key={p.id} href={`/projects/${p.id}`}>
               <Card className="hover:bg-accent/50 transition-colors">
                 <CardHeader className="py-3 px-4">
-                  <CardTitle className="text-base">{p.name}</CardTitle>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-base flex-1">{p.name}</CardTitle>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+                      onClick={(e) => handleDelete(p.id, e)}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
                   <CardDescription className="text-xs truncate">{p.workDir}</CardDescription>
                   {p.gitRemote && (
                     <Badge variant="outline" className="mt-1 w-fit text-xs">{p.gitRemote}</Badge>

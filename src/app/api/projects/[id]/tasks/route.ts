@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { tasks, commands, projects } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
 import { v4 as uuid } from 'uuid';
+import { getConfig } from '@/lib/config';
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id: projectId } = await params;
@@ -22,20 +23,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   // Auto-create initialization command
   const commandId = uuid();
-  const initPrompt = `你正在一个任务派发系统中工作。请基于以下任务描述完成初始化：
-
-1. 在项目工作目录 ${project.workDir} 下的 .worktrees/ 目录中创建 git worktree 作为本任务的工作空间
-2. 分支命名格式：task/${taskId.slice(0, 8)}
-3. 理解项目结构
-4. 如果任务过于庞大，请通过 MCP create_task 工具拆分为多个子任务
-
-任务描述：${description}`;
+  const initTemplate = getConfig('init_prompt');
+  const initPrompt = initTemplate
+    .replace(/\{workDir\}/g, project.workDir)
+    .replace(/\{description\}/g, description);
 
   db.insert(commands).values({
     id: commandId,
     taskId,
     prompt: initPrompt,
-    mode: 'execute',
+    mode: 'init',
     status: 'queued',
     priority: 10,
   }).run();

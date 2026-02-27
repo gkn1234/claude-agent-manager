@@ -32,6 +32,32 @@ const statusConfig: Record<string, { label: string; variant: 'default' | 'second
   aborted: { label: '已中止', variant: 'outline' },
 };
 
+const eventTypeColors: Record<string, string> = {
+  assistant: 'text-blue-400',
+  user: 'text-green-400',
+  system: 'text-yellow-400',
+  result: 'text-purple-400',
+  error: 'text-red-400',
+};
+
+function formatNDJSON(raw: string) {
+  const lines = raw.split('\n').filter(l => l.trim());
+  return lines.map((line, i) => {
+    try {
+      const obj = JSON.parse(line);
+      const typeColor = eventTypeColors[obj.type] || 'text-muted-foreground';
+      return (
+        <pre key={i} className="whitespace-pre-wrap border-b border-border/50 pb-1 last:border-0">
+          {obj.type && <span className={`font-semibold ${typeColor}`}>[{obj.type}] </span>}
+          {JSON.stringify(obj, null, 2)}
+        </pre>
+      );
+    } catch {
+      return <pre key={i} className="whitespace-pre-wrap text-muted-foreground">{line}</pre>;
+    }
+  });
+}
+
 export default function CommandDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -100,7 +126,7 @@ export default function CommandDetailPage() {
       {command.result && (
         <div className="mb-4">
           <h3 className="text-xs font-medium text-muted-foreground mb-2">结果</h3>
-          <div className="prose prose-sm dark:prose-invert max-w-none rounded-lg border p-4">
+          <div className="prose prose-sm dark:prose-invert max-w-none rounded-lg border p-4 max-h-[60vh] overflow-y-auto">
             <ReactMarkdown>{command.result}</ReactMarkdown>
           </div>
         </div>
@@ -117,9 +143,9 @@ export default function CommandDetailPage() {
           ) : (
             <div>
               <h3 className="text-xs font-medium text-muted-foreground mb-2">完整日志</h3>
-              <pre className="max-h-96 overflow-auto rounded-lg border bg-muted/50 p-3 text-xs">
-                {logs || '无日志内容'}
-              </pre>
+              <div className="max-h-96 overflow-auto rounded-lg border bg-muted/50 p-3 text-xs space-y-1">
+                {logs ? formatNDJSON(logs) : '无日志内容'}
+              </div>
             </div>
           )}
         </div>

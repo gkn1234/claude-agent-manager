@@ -5,20 +5,24 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
 
 interface ConfigItem {
   key: string;
   label: string;
   description: string;
-  unit: string;
+  unit?: string;
+  type: 'number' | 'text';
 }
 
 const CONFIG_ITEMS: ConfigItem[] = [
-  { key: 'max_concurrent', label: '最大并发数', description: '同时运行的 Claude 实例最大数量', unit: '个' },
-  { key: 'command_timeout', label: '指令超时时间', description: '单条指令的最大执行时间', unit: '秒' },
-  { key: 'log_retention_days', label: '日志保留天数', description: '日志文件自动清理的保留天数', unit: '天' },
-  { key: 'poll_interval', label: '轮询间隔', description: '调度器检查待执行指令的间隔', unit: '秒' },
+  { key: 'max_concurrent', label: '最大并发数', description: '同时运行的 Claude 实例最大数量', unit: '个', type: 'number' },
+  { key: 'command_timeout', label: '指令超时时间', description: '单条指令的最大执行时间', unit: '秒', type: 'number' },
+  { key: 'log_retention_days', label: '日志保留天数', description: '日志文件自动清理的保留天数', unit: '天', type: 'number' },
+  { key: 'poll_interval', label: '轮询间隔', description: '调度器检查待执行指令的间隔', unit: '秒', type: 'number' },
+  { key: 'init_prompt', label: '初始化提示词', description: '任务初始化时发送给 Claude 的提示词。可用占位符：{workDir}（项目目录）、{description}（任务描述）', type: 'text' },
+  { key: 'research_prompt', label: '调研提示词', description: '初始化完成后自动执行的调研提示词。可用占位符：{description}（任务描述）', type: 'text' },
 ];
 
 export default function SettingsPage() {
@@ -81,17 +85,27 @@ export default function SettingsPage() {
           {CONFIG_ITEMS.map((item) => (
             <div key={item.key} className="space-y-1.5">
               <Label htmlFor={item.key}>{item.label}</Label>
-              <div className="flex items-center gap-2">
-                <Input
+              {item.type === 'number' ? (
+                <div className="flex items-center gap-2">
+                  <Input
+                    id={item.key}
+                    type="number"
+                    min={item.key === 'poll_interval' ? 1 : 0}
+                    value={config[item.key] ?? ''}
+                    onChange={(e) => setConfig((prev) => ({ ...prev, [item.key]: e.target.value }))}
+                    className="max-w-[160px]"
+                  />
+                  {item.unit && <span className="text-sm text-muted-foreground">{item.unit}</span>}
+                </div>
+              ) : (
+                <Textarea
                   id={item.key}
-                  type="number"
-                  min={item.key === 'poll_interval' ? 1 : 0}
                   value={config[item.key] ?? ''}
                   onChange={(e) => setConfig((prev) => ({ ...prev, [item.key]: e.target.value }))}
-                  className="max-w-[160px]"
+                  rows={6}
+                  className="text-sm font-mono"
                 />
-                <span className="text-sm text-muted-foreground">{item.unit}</span>
-              </div>
+              )}
               <p className="text-xs text-muted-foreground">{item.description}</p>
             </div>
           ))}

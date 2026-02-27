@@ -1,9 +1,11 @@
 import { spawn, ChildProcess } from 'child_process';
-import { createWriteStream, mkdirSync, existsSync } from 'fs';
+import { createWriteStream, mkdirSync, existsSync, readdirSync } from 'fs';
 import { join } from 'path';
 import { db } from './db';
 import { commands, tasks, projects } from './schema';
 import { eq } from 'drizzle-orm';
+import { v4 as uuid } from 'uuid';
+import { getConfig } from './config';
 
 const LOG_DIR = process.env.LOG_DIR || './logs';
 
@@ -43,9 +45,8 @@ export async function runCommand(commandId: string): Promise<void> {
   ];
 
   // Add plan mode flag if needed
-  if (command.mode === 'plan') {
-    // claude -p with plan mode would use --plan flag or similar
-    // For now we include it in the prompt
+  if (command.mode === 'plan' || command.mode === 'research') {
+    args.push('--plan');
   }
 
   // Inject MCP config if available
@@ -54,12 +55,12 @@ export async function runCommand(commandId: string): Promise<void> {
     args.push('--mcp-config', mcpConfigPath);
   }
 
-  // Resume session if available
+  // Resume session if available (skip init/research commands for session isolation)
   const prevCommand = db.select()
     .from(commands)
     .where(eq(commands.taskId, command.taskId))
     .all()
-    .filter(c => c.sessionId && c.id !== commandId)
+    .filter(c => c.sessionId && c.id !== commandId && c.mode !== 'init' && c.mode !== 'research')
     .sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''))
     .pop();
 
@@ -147,15 +148,55 @@ export async function runCommand(commandId: string): Promise<void> {
       finishedAt: new Date().toISOString(),
     }).where(eq(commands.id, commandId)).run();
 
-    // If init command succeeded, update task status
-    if (code === 0) {
-      const cmd = db.select().from(commands).where(eq(commands.id, commandId)).get();
-      if (cmd && cmd.prompt.includes('创建 git worktree')) {
+    // If init command succeeded, find worktreeDir and create research command
+    if (code === 0 && command.mode === 'init') {
+      const taskData = db.select().from(tasks).where(eq(tasks.id, command.taskId)).get();
+      const projectData = db.select().from(projects).where(eq(projects.id, task.projectId)).get();
+      if (taskData && projectData) {
+        // Scan .worktrees/ to find the newly created worktree directory
+        const worktreesBase = join(projectData.workDir, '.worktrees');
+        let worktreeDir: string | null = null;
+        if (existsSync(worktreesBase)) {
+          try {
+            const dirs = readdirSync(worktreesBase, { withFileTypes: true })
+              .filter(d => d.isDirectory())
+              .sort((a, b) => b.name.localeCompare(a.name)); // newest name first as heuristic
+            if (dirs.length > 0) {
+              // Pick the most recently created directory
+              worktreeDir = join(worktreesBase, dirs[0].name);
+            }
+          } catch {}
+        }
+
+        // Update task: set worktreeDir and status to researching
         db.update(tasks).set({
-          status: 'ready',
+          status: 'researching',
+          ...(worktreeDir ? { worktreeDir } : {}),
           updatedAt: new Date().toISOString(),
-        }).where(eq(tasks.id, cmd.taskId)).run();
+        }).where(eq(tasks.id, command.taskId)).run();
+
+        // Auto-create research command
+        const researchId = uuid();
+        const researchTemplate = getConfig('research_prompt');
+        const researchPrompt = researchTemplate.replace('{description}', taskData.description);
+
+        db.insert(commands).values({
+          id: researchId,
+          taskId: command.taskId,
+          prompt: researchPrompt,
+          mode: 'research',
+          status: 'queued',
+          priority: 10,
+        }).run();
       }
+    }
+
+    // If research command succeeded, update task status to ready
+    if (code === 0 && command.mode === 'research') {
+      db.update(tasks).set({
+        status: 'ready',
+        updatedAt: new Date().toISOString(),
+      }).where(eq(tasks.id, command.taskId)).run();
     }
   });
 

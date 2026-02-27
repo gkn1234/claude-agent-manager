@@ -9,6 +9,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const task = db.select().from(tasks).where(eq(tasks.id, taskId)).get();
   if (!task) return NextResponse.json({ error: 'Task not found' }, { status: 404 });
 
+  // Only allow creating commands when task is ready
+  if (task.status !== 'ready') {
+    return NextResponse.json({ error: '任务尚未就绪，请等待初始化和调研完成' }, { status: 403 });
+  }
+
   const running = db.select().from(commands)
     .where(and(eq(commands.taskId, taskId), eq(commands.status, 'running')))
     .get();

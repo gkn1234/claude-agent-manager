@@ -66,9 +66,11 @@ export default function TaskPage() {
   }, [fetchTask]);
 
   const hasRunning = task?.commands.some(c => c.status === 'running') ?? false;
+  const isTaskReady = task?.status === 'ready';
+  const inputDisabled = hasRunning || !isTaskReady;
 
   const handleSend = async () => {
-    if (!prompt.trim() || hasRunning) return;
+    if (!prompt.trim() || inputDisabled) return;
     setSending(true);
     try {
       await fetch(`/api/tasks/${taskId}/commands`, {
@@ -86,7 +88,7 @@ export default function TaskPage() {
   if (loading) return <div className="flex h-[50vh] items-center justify-center text-muted-foreground">加载中...</div>;
   if (!task) return <div className="flex h-[50vh] items-center justify-center text-muted-foreground">任务不存在</div>;
 
-  const taskStatusLabel = task.status === 'initializing' ? '初始化中' : task.status === 'ready' ? '就绪' : '已归档';
+  const taskStatusLabel = task.status === 'initializing' ? '初始化中' : task.status === 'researching' ? '调研中' : task.status === 'ready' ? '就绪' : '已归档';
 
   return (
     <div className="flex flex-col h-[calc(100vh-56px)] md:h-screen">
@@ -132,6 +134,11 @@ export default function TaskPage() {
 
       {/* Input Area */}
       <div className="border-t px-4 py-3">
+        {!isTaskReady && !hasRunning && (
+          <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
+            <Loader2 className="h-3 w-3 animate-spin" /> 任务{task.status === 'initializing' ? '初始化' : '调研'}中，请等待完成后再派发指令...
+          </p>
+        )}
         {hasRunning && (
           <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
             <Loader2 className="h-3 w-3 animate-spin" /> 有指令正在执行中...
@@ -139,10 +146,10 @@ export default function TaskPage() {
         )}
         <div className="flex gap-2">
           <Textarea
-            placeholder={hasRunning ? '等待当前指令完成...' : '输入指令...'}
+            placeholder={inputDisabled ? (hasRunning ? '等待当前指令完成...' : '等待任务就绪...') : '输入指令...'}
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
-            disabled={hasRunning}
+            disabled={inputDisabled}
             rows={2}
             className="resize-none text-sm"
             onKeyDown={(e) => {
@@ -158,7 +165,7 @@ export default function TaskPage() {
             >
               {mode === 'plan' ? 'Plan' : 'Exec'}
             </Button>
-            <Button size="sm" onClick={handleSend} disabled={!prompt.trim() || hasRunning || sending}>
+            <Button size="sm" onClick={handleSend} disabled={!prompt.trim() || inputDisabled || sending}>
               <Send className="h-4 w-4" />
             </Button>
           </div>

@@ -15,16 +15,20 @@ export async function PATCH(request: Request) {
     const body = await request.json();
     const updates: Record<string, string> = {};
 
+    const NUMERIC_KEYS = ['max_concurrent', 'command_timeout', 'log_retention_days', 'poll_interval'];
+
     for (const [key, value] of Object.entries(body)) {
       if (!CONFIG_KEYS.includes(key)) {
         return NextResponse.json({ error: `无效配置项: ${key}` }, { status: 400 });
       }
-      const numVal = Number(value);
-      if (isNaN(numVal) || numVal < 0) {
-        return NextResponse.json({ error: `配置项 ${key} 必须为非负数` }, { status: 400 });
-      }
-      if (key === 'poll_interval' && numVal < 1) {
-        return NextResponse.json({ error: 'poll_interval 必须 >= 1' }, { status: 400 });
+      if (NUMERIC_KEYS.includes(key)) {
+        const numVal = Number(value);
+        if (isNaN(numVal) || numVal < 0) {
+          return NextResponse.json({ error: `配置项 ${key} 必须为非负数` }, { status: 400 });
+        }
+        if (key === 'poll_interval' && numVal < 1) {
+          return NextResponse.json({ error: 'poll_interval 必须 >= 1' }, { status: 400 });
+        }
       }
       updates[key] = String(value);
     }

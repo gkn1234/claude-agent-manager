@@ -41,10 +41,22 @@ export function CommandCard({ command, onAbort, draggable }: CommandCardProps) {
         <GripVertical className="mt-1 h-4 w-4 shrink-0 cursor-grab text-muted-foreground" />
       )}
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <span className="truncate">{command.projectName}</span>
-          <span>/</span>
-          <span className="truncate">{command.taskDescription?.slice(0, 30)}</span>
+        <div className="flex items-center gap-1 text-sm text-muted-foreground min-w-0">
+          <Link
+            href={`/projects/${command.projectId}`}
+            className="truncate max-w-[40%] py-1.5 px-1 -mx-1 rounded hover:underline hover:text-foreground"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {command.projectName}
+          </Link>
+          <span className="shrink-0">/</span>
+          <Link
+            href={`/tasks/${command.taskId}`}
+            className="truncate max-w-[55%] py-1.5 px-1 -mx-1 rounded hover:underline hover:text-foreground"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {command.taskDescription?.slice(0, 30)}
+          </Link>
         </div>
         <Link href={`/commands/${command.id}`} className="mt-1 block">
           <p className="line-clamp-2 text-sm">{command.prompt.slice(0, 100)}</p>
@@ -54,6 +66,12 @@ export function CommandCard({ command, onAbort, draggable }: CommandCardProps) {
             <Badge variant={config.variant}>{config.label}</Badge>
             {command.mode === 'plan' && (
               <Badge variant="outline">Plan</Badge>
+            )}
+            {command.mode === 'init' && (
+              <Badge variant="outline">Init</Badge>
+            )}
+            {command.mode === 'research' && (
+              <Badge variant="outline">调研</Badge>
             )}
           </div>
           <div className="flex items-center gap-2">
