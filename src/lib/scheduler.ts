@@ -2,8 +2,8 @@ import { db } from './db';
 import { commands } from './schema';
 import { eq, and, asc, desc } from 'drizzle-orm';
 import { runCommand, runningProcesses } from './claude-runner';
+import { getConfig } from '@/lib/config';
 
-const MAX_CONCURRENT = parseInt(process.env.MAX_CONCURRENT || '2');
 const POLL_INTERVAL = parseInt(process.env.POLL_INTERVAL || '5') * 1000;
 
 let schedulerTimer: ReturnType<typeof setInterval> | null = null;
@@ -14,7 +14,7 @@ export function startScheduler() {
   recoverOrphanedCommands();
 
   schedulerTimer = setInterval(tick, POLL_INTERVAL);
-  console.log(`[Scheduler] Started, max_concurrent=${MAX_CONCURRENT}, poll_interval=${POLL_INTERVAL}ms`);
+  console.log(`[Scheduler] Started, poll_interval=${POLL_INTERVAL}ms`);
 
   tick();
 }
@@ -27,10 +27,11 @@ export function stopScheduler() {
 }
 
 function tick() {
+  const maxConcurrent = parseInt(getConfig('max_concurrent', '2'));
   const runningCount = runningProcesses.size;
-  if (runningCount >= MAX_CONCURRENT) return;
+  if (runningCount >= maxConcurrent) return;
 
-  const slotsAvailable = MAX_CONCURRENT - runningCount;
+  const slotsAvailable = maxConcurrent - runningCount;
 
   const queued = db.select()
     .from(commands)

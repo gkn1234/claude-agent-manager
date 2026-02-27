@@ -9,6 +9,8 @@ const CONFIG_DEFAULTS: Record<string, string> = {
   poll_interval: '5',
 };
 
+export const CONFIG_KEYS = Object.keys(CONFIG_DEFAULTS) as Array<keyof typeof CONFIG_DEFAULTS>;
+
 export function getConfig(key: string, defaultValue?: string): string {
   const row = db.select().from(config).where(eq(config.key, key)).get();
   if (row) return row.value;

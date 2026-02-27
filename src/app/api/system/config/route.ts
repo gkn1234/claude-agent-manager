@@ -1,7 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getAllConfig, setConfig } from '@/lib/config';
-
-const VALID_KEYS = ['max_concurrent', 'command_timeout', 'log_retention_days', 'poll_interval'];
+import { getAllConfig, setConfig, CONFIG_KEYS } from '@/lib/config';
 
 export async function GET() {
   try {
@@ -18,12 +16,15 @@ export async function PATCH(request: Request) {
     const updates: Record<string, string> = {};
 
     for (const [key, value] of Object.entries(body)) {
-      if (!VALID_KEYS.includes(key)) {
+      if (!CONFIG_KEYS.includes(key)) {
         return NextResponse.json({ error: `无效配置项: ${key}` }, { status: 400 });
       }
       const numVal = Number(value);
       if (isNaN(numVal) || numVal < 0) {
         return NextResponse.json({ error: `配置项 ${key} 必须为非负数` }, { status: 400 });
+      }
+      if (key === 'poll_interval' && numVal < 1) {
+        return NextResponse.json({ error: 'poll_interval 必须 >= 1' }, { status: 400 });
       }
       updates[key] = String(value);
     }

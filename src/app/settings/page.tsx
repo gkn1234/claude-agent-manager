@@ -85,7 +85,7 @@ export default function SettingsPage() {
                 <Input
                   id={item.key}
                   type="number"
-                  min={0}
+                  min={item.key === 'poll_interval' ? 1 : 0}
                   value={config[item.key] ?? ''}
                   onChange={(e) => setConfig((prev) => ({ ...prev, [item.key]: e.target.value }))}
                   className="max-w-[160px]"
