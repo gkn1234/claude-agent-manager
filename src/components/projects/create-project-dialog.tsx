@@ -14,7 +14,7 @@ interface CreateProjectDialogProps {
 
 export function CreateProjectDialog({ onCreated }: CreateProjectDialogProps) {
   const [open, setOpen] = useState(false);
-  const [mode, setMode] = useState<Mode>('local');
+  const [mode, setMode] = useState<Mode>('new');
   const [name, setName] = useState('');
   const [workDir, setWorkDir] = useState('');
   const [gitUrl, setGitUrl] = useState('');
@@ -22,25 +22,43 @@ export function CreateProjectDialog({ onCreated }: CreateProjectDialogProps) {
   const [error, setError] = useState('');
 
   const handleSubmit = async () => {
+    if ((mode === 'clone' || mode === 'new') && !name.trim()) {
+      setError('请输入项目名称');
+      return;
+    }
+    if (mode === 'local' && !workDir.trim()) {
+      setError('请输入本地项目目录路径');
+      return;
+    }
+    if (mode === 'clone' && !gitUrl.trim()) {
+      setError('请输入 Git URL');
+      return;
+    }
+
     setLoading(true);
     setError('');
     try {
       const res = await fetch('/api/projects', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name || workDir.split('/').pop(), workDir, gitUrl, mode }),
+        body: JSON.stringify({
+          name: name.trim() || workDir.split('/').pop(),
+          workDir: workDir.trim() || undefined,
+          gitUrl: gitUrl.trim() || undefined,
+          mode,
+        }),
       });
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error || 'Failed to create project');
+        throw new Error(data.error || '创建失败');
       }
       setOpen(false);
       setName('');
       setWorkDir('');
       setGitUrl('');
       onCreated();
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : '创建失败');
     } finally {
       setLoading(false);
     }
@@ -57,12 +75,12 @@ export function CreateProjectDialog({ onCreated }: CreateProjectDialogProps) {
         </DialogHeader>
 
         <div className="flex gap-2 mb-4">
-          {(['local', 'clone', 'new'] as Mode[]).map((m) => (
+          {(['new', 'clone', 'local'] as Mode[]).map((m) => (
             <Button
               key={m}
               size="sm"
               variant={mode === m ? 'default' : 'outline'}
-              onClick={() => setMode(m)}
+              onClick={() => { setMode(m); setError(''); }}
             >
               {m === 'local' ? '本地项目' : m === 'clone' ? 'Git Clone' : '新建'}
             </Button>
@@ -73,16 +91,25 @@ export function CreateProjectDialog({ onCreated }: CreateProjectDialogProps) {
           {mode === 'local' && (
             <Input placeholder="本地项目目录路径" value={workDir} onChange={(e) => setWorkDir(e.target.value)} />
           )}
+
           {mode === 'clone' && (
             <>
+              <Input placeholder="项目名称" value={name} onChange={(e) => setName(e.target.value)} />
               <Input placeholder="Git URL" value={gitUrl} onChange={(e) => setGitUrl(e.target.value)} />
-              <Input placeholder="目标目录 (可选)" value={workDir} onChange={(e) => setWorkDir(e.target.value)} />
+              <p className="text-xs text-muted-foreground">
+                默认目录：~/claude-agent-manager/{name || '<项目名称>'}
+              </p>
+              <Input placeholder="自定义目录（可选，覆盖默认）" value={workDir} onChange={(e) => setWorkDir(e.target.value)} />
             </>
           )}
+
           {mode === 'new' && (
             <>
               <Input placeholder="项目名称" value={name} onChange={(e) => setName(e.target.value)} />
-              <Input placeholder="项目目录 (可选)" value={workDir} onChange={(e) => setWorkDir(e.target.value)} />
+              <p className="text-xs text-muted-foreground">
+                默认目录：~/claude-agent-manager/{name || '<项目名称>'}
+              </p>
+              <Input placeholder="自定义目录（可选，覆盖默认）" value={workDir} onChange={(e) => setWorkDir(e.target.value)} />
             </>
           )}
 
