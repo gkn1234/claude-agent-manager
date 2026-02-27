@@ -13,8 +13,8 @@ Entry point for LLM agents navigating the Claude Dispatch documentation. Read do
 | Document | Description |
 |---|---|
 | [projects-architecture](architecture/projects-architecture.md) | How the Projects entity works: schema, API routes, git utilities, and the three creation modes (clone, new, local). |
-| [tasks-architecture](architecture/tasks-architecture.md) | How Tasks provide git worktree isolation and serial command execution within a project. Covers creation, init commands, and worktree lifecycle. |
-| [commands-scheduler-architecture](architecture/commands-scheduler-architecture.md) | The command execution pipeline: priority-based scheduling, concurrency control, Claude CLI subprocess lifecycle, timeout enforcement, and orphan recovery. |
+| [tasks-architecture](architecture/tasks-architecture.md) | How Tasks provide git worktree isolation and a two-phase init pipeline (init -> research -> ready). Covers status gating, session isolation, and configurable prompts. |
+| [commands-scheduler-architecture](architecture/commands-scheduler-architecture.md) | The command execution pipeline: priority-based scheduling, concurrency control, mode-based CLI flags (init/research/plan/execute), and runner post-processing. |
 | [mcp-feedback-loop](architecture/mcp-feedback-loop.md) | Bidirectional MCP bridge between Claude subprocesses and the app. Covers the 4 MCP tools (create_task, update_command, get_task_context, list_tasks) and how recursive task decomposition works. |
 
 ## Guides
@@ -30,6 +30,7 @@ Entry point for LLM agents navigating the Claude Dispatch documentation. Read do
 
 | Document | Description |
 |---|---|
+| [config-keys](reference/config-keys.md) | All runtime configuration keys: scheduler params (max_concurrent, poll_interval, command_timeout), prompt templates (init_prompt, research_prompt), and API validation rules. |
 | [coding-conventions](reference/coding-conventions.md) | Project coding standards: Next.js 16, TypeScript strict, pnpm, Tailwind v4, shadcn/ui, Drizzle ORM + SQLite, Zod validation, zh-CN UI. |
 | [git-conventions](reference/git-conventions.md) | Git workflow: single main branch, worktree-based task isolation, Conventional Commits format. |
 | [command-state-machine](reference/command-state-machine.md) | Complete state transition rules for commands: 6 states (pending, queued, running, completed, failed, aborted) with enforced transition map. |
