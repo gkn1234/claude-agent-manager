@@ -14,8 +14,10 @@ interface Task {
   id: string;
   description: string;
   branch: string | null;
+  worktreeDir: string | null;
   status: string;
   createdAt: string;
+  updatedAt: string | null;
 }
 
 interface Project {
@@ -119,6 +121,14 @@ export default function ProjectDetailPage() {
                     </div>
                     {task.branch && (
                       <CardDescription className="text-xs">{task.branch}</CardDescription>
+                    )}
+                    {task.worktreeDir && (
+                      <CardDescription className="text-xs font-mono truncate">{task.worktreeDir}</CardDescription>
+                    )}
+                    {task.updatedAt && (
+                      <CardDescription className="text-xs">
+                        活跃：{new Date(task.updatedAt).toLocaleString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      </CardDescription>
                     )}
                   </CardHeader>
                 </Card>

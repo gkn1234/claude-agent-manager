@@ -26,7 +26,7 @@ export default function HomePage() {
     selectedProjectId ? { projectId: selectedProjectId } :
     undefined;
 
-  const { grouped, loading, abortCommand } = useCommands(filters);
+  const { grouped, loading, abortCommand, reorderCommands } = useCommands(filters);
 
   const fetchProjects = useCallback(async () => {
     try {
@@ -121,7 +121,8 @@ export default function HomePage() {
             icon="⏳"
             commands={grouped.queued}
             defaultOpen={true}
-            draggable={true}
+            draggable={!filters}
+            onReorder={reorderCommands}
           />
           <StatusGroup
             title="已完成"

@@ -4,30 +4,12 @@ import { providers } from '@/lib/schema';
 import { eq, asc } from 'drizzle-orm';
 import { v4 as uuid } from 'uuid';
 
-const SENSITIVE_PATTERNS = /KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL/i;
-
-function maskEnvJson(envJson: string): Record<string, string> {
-  try {
-    const parsed = JSON.parse(envJson);
-    const masked: Record<string, string> = {};
-    for (const [k, v] of Object.entries(parsed)) {
-      const val = String(v);
-      masked[k] = SENSITIVE_PATTERNS.test(k) && val.length > 8
-        ? val.slice(0, 8) + '••••'
-        : val;
-    }
-    return masked;
-  } catch {
-    return {};
-  }
-}
-
 export async function GET() {
   try {
     const rows = db.select().from(providers).orderBy(asc(providers.sortOrder)).all();
     const result = rows.map(r => ({
       ...r,
-      envJson: maskEnvJson(r.envJson),
+      envJson: (() => { try { return JSON.parse(r.envJson); } catch { return {}; } })(),
     }));
     return NextResponse.json(result);
   } catch (error) {
@@ -60,7 +42,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       ...created,
-      envJson: created ? maskEnvJson(created.envJson) : {},
+      envJson: created ? (() => { try { return JSON.parse(created.envJson); } catch { return {}; } })() : {},
     }, { status: 201 });
   } catch (error) {
     return NextResponse.json({ error: String(error) }, { status: 500 });

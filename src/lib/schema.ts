@@ -7,8 +7,8 @@ export const projects = sqliteTable('projects', {
   name: text('name').notNull(),
   workDir: text('work_dir').notNull(),
   gitRemote: text('git_remote'),
-  createdAt: text('created_at').default(sql`(datetime('now'))`),
-  updatedAt: text('updated_at').default(sql`(datetime('now'))`),
+  createdAt: text('created_at').default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
+  updatedAt: text('updated_at').default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
 });
 
 export const tasks = sqliteTable('tasks', {
@@ -20,8 +20,8 @@ export const tasks = sqliteTable('tasks', {
   status: text('status').default('initializing'),
   lastProviderId: text('last_provider_id'),
   lastMode: text('last_mode'),
-  createdAt: text('created_at').default(sql`(datetime('now'))`),
-  updatedAt: text('updated_at').default(sql`(datetime('now'))`),
+  createdAt: text('created_at').default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
+  updatedAt: text('updated_at').default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
 });
 
 export const commands = sqliteTable('commands', {
@@ -39,7 +39,7 @@ export const commands = sqliteTable('commands', {
   pid: integer('pid'),
   startedAt: text('started_at'),
   finishedAt: text('finished_at'),
-  createdAt: text('created_at').default(sql`(datetime('now'))`),
+  createdAt: text('created_at').default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
 });
 
 export const providers = sqliteTable('providers', {
@@ -48,8 +48,8 @@ export const providers = sqliteTable('providers', {
   envJson: text('env_json').notNull(),
   isDefault: integer('is_default').default(0),
   sortOrder: integer('sort_order').default(0),
-  createdAt: text('created_at').default(sql`(datetime('now'))`),
-  updatedAt: text('updated_at').default(sql`(datetime('now'))`),
+  createdAt: text('created_at').default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
+  updatedAt: text('updated_at').default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
 });
 
 export const config = sqliteTable('config', {

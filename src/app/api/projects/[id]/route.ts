@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { projects, tasks } from '@/lib/schema';
-import { eq } from 'drizzle-orm';
+import { eq, desc } from 'drizzle-orm';
 import { cleanupTask } from '@/lib/claude-runner';
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -9,7 +9,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const project = db.select().from(projects).where(eq(projects.id, id)).get();
   if (!project) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  const projectTasks = db.select().from(tasks).where(eq(tasks.projectId, id)).all();
+  const projectTasks = db.select().from(tasks).where(eq(tasks.projectId, id)).orderBy(desc(tasks.updatedAt)).all();
   return NextResponse.json({ ...project, tasks: projectTasks });
 }
 
