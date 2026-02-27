@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { ArrowLeft, FileText } from 'lucide-react';
+import { ArrowLeft, FileText, ChevronDown, ChevronRight } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 
 interface CommandDetail {
@@ -18,6 +18,8 @@ interface CommandDetail {
   result: string | null;
   logFile: string | null;
   sessionId: string | null;
+  execEnv: string | null;
+  providerId: string | null;
   startedAt: string | null;
   finishedAt: string | null;
   createdAt: string;
@@ -66,6 +68,7 @@ export default function CommandDetailPage() {
   const [command, setCommand] = useState<CommandDetail | null>(null);
   const [logs, setLogs] = useState<string | null>(null);
   const [showLogs, setShowLogs] = useState(false);
+  const [showExecEnv, setShowExecEnv] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const fetchCommand = useCallback(async () => {
@@ -105,6 +108,8 @@ export default function CommandDetailPage() {
         </Button>
         <Badge variant={config.variant}>{config.label}</Badge>
         {command.mode === 'plan' && <Badge variant="outline">Plan</Badge>}
+        {command.mode === 'init' && <Badge variant="outline">Init</Badge>}
+        {command.mode === 'research' && <Badge variant="outline">调研</Badge>}
       </div>
 
       {/* Prompt */}
@@ -119,6 +124,53 @@ export default function CommandDetailPage() {
         {command.finishedAt && <div>结束：{new Date(command.finishedAt).toLocaleString('zh-CN')}</div>}
         {command.sessionId && <div className="col-span-2 truncate">Session: {command.sessionId}</div>}
       </div>
+
+      {/* Execution Environment */}
+      {command.execEnv && (() => {
+        try {
+          const env = JSON.parse(command.execEnv) as { args?: string[]; env?: Record<string, string>; cwd?: string; providerName?: string | null };
+          return (
+            <div className="mb-4">
+              <button
+                className="flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                onClick={() => setShowExecEnv(!showExecEnv)}
+              >
+                {showExecEnv ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                执行参数
+                {env.providerName && <Badge variant="outline" className="text-xs ml-1">{env.providerName}</Badge>}
+              </button>
+              {showExecEnv && (
+                <div className="mt-2 rounded-lg border bg-muted/50 p-3 text-xs space-y-2">
+                  {env.cwd && (
+                    <div>
+                      <span className="text-muted-foreground">工作目录：</span>
+                      <span className="font-mono">{env.cwd}</span>
+                    </div>
+                  )}
+                  {env.args && env.args.length > 0 && (
+                    <div>
+                      <span className="text-muted-foreground">CLI 参数：</span>
+                      <span className="font-mono">{env.args.join(' ')}</span>
+                    </div>
+                  )}
+                  {env.env && Object.keys(env.env).length > 0 && (
+                    <div>
+                      <span className="text-muted-foreground">环境变量：</span>
+                      <div className="mt-1 space-y-0.5 font-mono">
+                        {Object.entries(env.env).map(([k, v]) => (
+                          <div key={k}><span className="text-blue-500">{k}</span>=<span>{v}</span></div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        } catch {
+          return null;
+        }
+      })()}
 
       <Separator className="mb-4" />
 

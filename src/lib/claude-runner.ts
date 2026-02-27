@@ -1,8 +1,8 @@
-import { spawn, ChildProcess } from 'child_process';
-import { createWriteStream, mkdirSync, existsSync, readdirSync } from 'fs';
+import { spawn, ChildProcess, execFileSync } from 'child_process';
+import { createWriteStream, mkdirSync, existsSync, readdirSync, unlinkSync, statSync } from 'fs';
 import { join } from 'path';
 import { db } from './db';
-import { commands, tasks, projects } from './schema';
+import { commands, tasks, projects, providers } from './schema';
 import { eq } from 'drizzle-orm';
 import { v4 as uuid } from 'uuid';
 import { getConfig } from './config';
@@ -16,6 +16,41 @@ export interface RunningProcess {
 }
 
 export const runningProcesses = new Map<string, RunningProcess>();
+
+/**
+ * Clean up a task: kill running processes, remove log files, remove git worktree, delete DB records.
+ */
+export function cleanupTask(taskId: string) {
+  const task = db.select().from(tasks).where(eq(tasks.id, taskId)).get();
+  if (!task) return;
+
+  const taskCommands = db.select().from(commands).where(eq(commands.taskId, taskId)).all();
+
+  for (const cmd of taskCommands) {
+    // Kill running process
+    const running = runningProcesses.get(cmd.id);
+    if (running) {
+      try { running.process.kill('SIGTERM'); } catch {}
+      setTimeout(() => { try { running.process.kill('SIGKILL'); } catch {} }, 3000);
+      runningProcesses.delete(cmd.id);
+    }
+    // Remove log file
+    if (cmd.logFile) {
+      try { if (existsSync(cmd.logFile)) unlinkSync(cmd.logFile); } catch {}
+    }
+  }
+
+  // Remove git worktree
+  if (task.worktreeDir && existsSync(task.worktreeDir)) {
+    try {
+      execFileSync('git', ['worktree', 'remove', task.worktreeDir, '--force'], { encoding: 'utf-8' });
+    } catch {}
+  }
+
+  // Delete DB records
+  db.delete(commands).where(eq(commands.taskId, taskId)).run();
+  db.delete(tasks).where(eq(tasks.id, taskId)).run();
+}
 
 export async function runCommand(commandId: string): Promise<void> {
   const command = db.select().from(commands).where(eq(commands.id, commandId)).get();
@@ -46,7 +81,7 @@ export async function runCommand(commandId: string): Promise<void> {
 
   // Add plan mode flag if needed
   if (command.mode === 'plan' || command.mode === 'research') {
-    args.push('--plan');
+    args.push('--permission-mode', 'plan');
   }
 
   // Inject MCP config if available
@@ -68,11 +103,56 @@ export async function runCommand(commandId: string): Promise<void> {
     args.push('--resume', prevCommand.sessionId);
   }
 
+  // Build spawn environment with provider injection
+  const PROVIDER_ENV_KEYS = [
+    'ANTHROPIC_AUTH_TOKEN', 'ANTHROPIC_API_KEY', 'ANTHROPIC_BASE_URL',
+    'ANTHROPIC_MODEL', 'ANTHROPIC_DEFAULT_SONNET_MODEL', 'ANTHROPIC_DEFAULT_OPUS_MODEL',
+    'ANTHROPIC_DEFAULT_HAIKU_MODEL', 'CLAUDE_CODE_USE_BEDROCK', 'CLAUDE_CODE_USE_VERTEX',
+    'CLAUDE_CODE_USE_FOUNDRY',
+  ];
+
+  const spawnEnv = { ...process.env };
+  let providerName: string | null = null;
+
+  if (command.providerId) {
+    const provider = db.select().from(providers).where(eq(providers.id, command.providerId)).get();
+    if (provider) {
+      providerName = provider.name;
+      // Clear conflicting provider env vars
+      for (const key of PROVIDER_ENV_KEYS) {
+        delete spawnEnv[key];
+      }
+      // Inject profile env vars
+      try {
+        const envVars = JSON.parse(provider.envJson);
+        Object.assign(spawnEnv, envVars);
+      } catch {}
+    }
+  }
+
+  // Record execution environment for audit (sanitized)
+  const SENSITIVE_PATTERN = /KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL/i;
+  const execInfo = {
+    args: args.filter(a => a !== command.prompt).concat(['[prompt omitted]']),
+    env: Object.fromEntries(
+      Object.entries(spawnEnv)
+        .filter(([k]) => k.startsWith('ANTHROPIC_') || k.startsWith('CLAUDE_CODE_') || k.startsWith('AWS_'))
+        .map(([k, v]) => [k, SENSITIVE_PATTERN.test(k) && v && v.length > 8
+          ? v.slice(0, 8) + '••••'
+          : v || ''
+        ])
+    ),
+    cwd,
+    providerName,
+  };
+  db.update(commands).set({ execEnv: JSON.stringify(execInfo) })
+    .where(eq(commands.id, commandId)).run();
+
   // Spawn claude process
   const child = spawn('claude', args, {
     cwd,
     stdio: ['ignore', 'pipe', 'pipe'],
-    env: { ...process.env },
+    env: spawnEnv,
   });
 
   if (!child.pid) {
@@ -158,11 +238,23 @@ export async function runCommand(commandId: string): Promise<void> {
         let worktreeDir: string | null = null;
         if (existsSync(worktreesBase)) {
           try {
+            // Get existing worktree dirs already assigned to other tasks
+            const usedDirs = new Set(
+              db.select({ worktreeDir: tasks.worktreeDir }).from(tasks).all()
+                .map(t => t.worktreeDir)
+                .filter(Boolean)
+            );
+
             const dirs = readdirSync(worktreesBase, { withFileTypes: true })
               .filter(d => d.isDirectory())
-              .sort((a, b) => b.name.localeCompare(a.name)); // newest name first as heuristic
+              .filter(d => !usedDirs.has(join(worktreesBase, d.name)))
+              .sort((a, b) => {
+                // Sort by creation time, newest first
+                const aTime = statSync(join(worktreesBase, a.name)).birthtimeMs;
+                const bTime = statSync(join(worktreesBase, b.name)).birthtimeMs;
+                return bTime - aTime;
+              });
             if (dirs.length > 0) {
-              // Pick the most recently created directory
               worktreeDir = join(worktreesBase, dirs[0].name);
             }
           } catch {}
@@ -187,6 +279,7 @@ export async function runCommand(commandId: string): Promise<void> {
           mode: 'research',
           status: 'queued',
           priority: 10,
+          providerId: command.providerId,
         }).run();
       }
     }

@@ -2,8 +2,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { tasks, commands } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
-import { execFileSync } from 'child_process';
-import { existsSync } from 'fs';
+import { cleanupTask } from '@/lib/claude-runner';
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -14,21 +13,26 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   return NextResponse.json({ ...task, commands: taskCommands });
 }
 
+export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const task = db.select().from(tasks).where(eq(tasks.id, id)).get();
+  if (!task) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+
+  const body = await req.json();
+  const updates: Record<string, unknown> = { updatedAt: new Date().toISOString() };
+
+  if (body.lastProviderId !== undefined) updates.lastProviderId = body.lastProviderId;
+  if (body.lastMode !== undefined) updates.lastMode = body.lastMode;
+
+  db.update(tasks).set(updates).where(eq(tasks.id, id)).run();
+  return NextResponse.json({ ok: true });
+}
+
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const task = db.select().from(tasks).where(eq(tasks.id, id)).get();
   if (!task) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  if (task.worktreeDir && existsSync(task.worktreeDir)) {
-    try {
-      execFileSync('git', ['worktree', 'remove', task.worktreeDir, '--force'], { encoding: 'utf-8' });
-    } catch {
-      // Force remove directory if git worktree remove fails
-    }
-  }
-
-  db.delete(commands).where(eq(commands.taskId, id)).run();
-  db.delete(tasks).where(eq(tasks.id, id)).run();
-
+  cleanupTask(id);
   return NextResponse.json({ ok: true });
 }

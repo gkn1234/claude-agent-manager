@@ -18,6 +18,8 @@ export const tasks = sqliteTable('tasks', {
   branch: text('branch'),
   worktreeDir: text('worktree_dir'),
   status: text('status').default('initializing'),
+  lastProviderId: text('last_provider_id'),
+  lastMode: text('last_mode'),
   createdAt: text('created_at').default(sql`(datetime('now'))`),
   updatedAt: text('updated_at').default(sql`(datetime('now'))`),
 });
@@ -29,13 +31,25 @@ export const commands = sqliteTable('commands', {
   mode: text('mode').default('execute'),
   status: text('status').default('pending'),
   priority: integer('priority').default(0),
+  providerId: text('provider_id'),
   result: text('result'),
   logFile: text('log_file'),
+  execEnv: text('exec_env'),
   sessionId: text('session_id'),
   pid: integer('pid'),
   startedAt: text('started_at'),
   finishedAt: text('finished_at'),
   createdAt: text('created_at').default(sql`(datetime('now'))`),
+});
+
+export const providers = sqliteTable('providers', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  envJson: text('env_json').notNull(),
+  isDefault: integer('is_default').default(0),
+  sortOrder: integer('sort_order').default(0),
+  createdAt: text('created_at').default(sql`(datetime('now'))`),
+  updatedAt: text('updated_at').default(sql`(datetime('now'))`),
 });
 
 export const config = sqliteTable('config', {
@@ -55,4 +69,5 @@ export const tasksRelations = relations(tasks, ({ one, many }) => ({
 
 export const commandsRelations = relations(commands, ({ one }) => ({
   task: one(tasks, { fields: [commands.taskId], references: [tasks.id] }),
+  provider: one(providers, { fields: [commands.providerId], references: [providers.id] }),
 }));

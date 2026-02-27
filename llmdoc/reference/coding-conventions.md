@@ -4,7 +4,7 @@ This document provides a high-level summary of the project's coding conventions,
 
 ## 1. Core Summary
 
-This is a Next.js 16 App Router project using TypeScript in strict mode, pnpm as the package manager, Tailwind CSS v4 for styling, shadcn/ui (new-york style) with Radix UI primitives for components, Drizzle ORM with SQLite for persistence, and Zod for validation. The UI language is Chinese (zh-CN).
+This is a Next.js 16 App Router project using TypeScript in strict mode, pnpm as the package manager, Tailwind CSS v4 for styling, shadcn/ui (new-york style) with Radix UI primitives for components, Drizzle ORM with SQLite for persistence, Zod for validation, and `@dnd-kit/core` + `@dnd-kit/sortable` for drag-and-drop interactions. The UI language is Chinese (zh-CN).
 
 ## 2. Source of Truth
 

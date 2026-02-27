@@ -19,13 +19,17 @@ export interface Command {
   projectName: string;
 }
 
-export function useCommands() {
+export function useCommands(filters?: { projectId?: string; taskId?: string }) {
   const [commands, setCommands] = useState<Command[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchCommands = useCallback(async () => {
     try {
-      const res = await fetch('/api/commands');
+      const params = new URLSearchParams();
+      if (filters?.projectId) params.set('project_id', filters.projectId);
+      if (filters?.taskId) params.set('task_id', filters.taskId);
+      const qs = params.toString();
+      const res = await fetch(`/api/commands${qs ? `?${qs}` : ''}`);
       const data = await res.json();
       setCommands(data);
     } catch (err) {
@@ -33,7 +37,7 @@ export function useCommands() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [filters?.projectId, filters?.taskId]);
 
   useEffect(() => {
     fetchCommands();

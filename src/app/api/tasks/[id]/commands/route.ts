@@ -21,8 +21,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ error: 'Task has a running command' }, { status: 409 });
   }
 
-  const { prompt, mode = 'execute', autoQueue = true } = await req.json();
+  const { prompt, mode = 'execute', autoQueue = true, providerId = null } = await req.json();
   if (!prompt) return NextResponse.json({ error: 'prompt required' }, { status: 400 });
+  if (!providerId) return NextResponse.json({ error: '请选择 Provider' }, { status: 400 });
 
   const id = uuid();
   db.insert(commands).values({
@@ -30,6 +31,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     taskId,
     prompt,
     mode,
+    providerId,
     status: autoQueue ? 'queued' : 'pending',
   }).run();
 

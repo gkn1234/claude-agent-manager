@@ -25,6 +25,8 @@ The system uses a DB-backed configuration table (`config`) with in-code defaults
 | `init_prompt` | string | *(see below)* | Template for task init commands. Placeholders: `{workDir}`, `{description}` |
 | `research_prompt` | string | *(see below)* | Template for task research commands. Placeholders: `{description}` |
 
+The `init_prompt` is used by `src/app/api/tasks/[id]/init/route.ts:35-38` when manually triggering init. The `research_prompt` is used by `src/lib/claude-runner.ts:272-273` when auto-creating the research command after init success.
+
 ## 4. API Validation Rules
 
 The PATCH endpoint at `src/app/api/system/config/route.ts:13-44` enforces:

@@ -10,7 +10,7 @@ The project uses a single `main` branch with linear history (no feature branches
 
 - **Primary branch:** `main` (only branch; no remote feature branches).
 - **Task isolation:** Git worktrees are used instead of feature branches. Each task creates a worktree at `<projectWorkDir>/.worktrees/<taskDir>`. See `docs/initial-design.md` for the design rationale.
-- **Worktree lifecycle:** Created during task initialization, deleted when the task is removed.
+- **Worktree lifecycle:** Created during task initialization (triggered manually via `/api/tasks/:id/init`), deleted via `cleanupTask()` when the task or project is removed.
 
 ## 3. Commit Message Format
 
@@ -41,6 +41,7 @@ This is appended automatically when Claude Code creates commits.
 ## 5. Source of Truth
 
 - **Worktree design:** `docs/initial-design.md` - Task initialization and worktree creation flow.
-- **Worktree runtime usage:** `src/lib/claude-runner.ts:26-30` - Resolves `worktreeDir` for command execution.
-- **Init command detection:** `src/lib/claude-runner.ts:153` - Checks for worktree creation in init commands.
+- **Worktree runtime usage:** `src/lib/claude-runner.ts:66-67` - Resolves `worktreeDir` for command execution.
+- **Worktree detection after init:** `src/lib/claude-runner.ts:239-261` - Scans `.worktrees/` by creation time, excluding dirs assigned to other tasks.
+- **Worktree cleanup:** `src/lib/claude-runner.ts:44-48` - `cleanupTask()` runs `git worktree remove --force`.
 - **Gitignore for worktrees:** `.gitignore` - Excludes `.worktrees/` from version control.

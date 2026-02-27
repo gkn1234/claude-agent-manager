@@ -31,11 +31,10 @@ A guide for creating, listing, retrieving, and deleting projects through the RES
 
 1. **Send:** `GET /api/projects/<id>`
 2. **Response:** Project object with a nested `tasks` array, or `404` if not found.
-   See `src/app/api/projects/[id]/route.ts:6-12`.
+   See `src/app/api/projects/[id]/route.ts:7-14`.
 
 ## Deleting a Project
 
 1. **Send:** `DELETE /api/projects/<id>`
-2. **Cascade behavior:** The system deletes in order: commands (for all project tasks) -> tasks -> project record. See `src/app/api/projects/[id]/route.ts:15-27`.
-3. **Important:** The filesystem directory is NOT removed. Only database records are deleted. Manual cleanup of the directory is required if desired.
-4. **Response:** `{ "ok": true }` on success, `404` if project not found.
+2. **Cascade behavior:** The system calls `cleanupTask()` for each task, which kills running processes, deletes log files, removes git worktrees, and deletes commands + task DB records. Then deletes the project row. See `src/app/api/projects/[id]/route.ts:16-28`.
+3. **Response:** `{ "ok": true }` on success, `404` if project not found.

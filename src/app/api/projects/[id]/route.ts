@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { projects, tasks, commands } from '@/lib/schema';
+import { projects, tasks } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
+import { cleanupTask } from '@/lib/claude-runner';
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -19,9 +20,8 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
 
   const projectTasks = db.select().from(tasks).where(eq(tasks.projectId, id)).all();
   for (const task of projectTasks) {
-    db.delete(commands).where(eq(commands.taskId, task.id)).run();
+    cleanupTask(task.id);
   }
-  db.delete(tasks).where(eq(tasks.projectId, id)).run();
   db.delete(projects).where(eq(projects.id, id)).run();
 
   return NextResponse.json({ ok: true });

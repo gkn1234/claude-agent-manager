@@ -4,12 +4,12 @@ This document defines the complete state transition rules for the `commands` tab
 
 ## 1. Core Summary
 
-Commands follow a strict state machine with 6 states: `pending`, `queued`, `running`, `completed`, `failed`, `aborted`. The last three are terminal -- no outbound transitions are permitted. Transitions are enforced by the `VALID_TRANSITIONS` map in the PATCH endpoint, while `queued -> running` is performed exclusively by the scheduler/runner internally.
+Commands follow a strict state machine with 6 states: `pending`, `queued`, `running`, `completed`, `failed`, `aborted`. The last three are terminal -- no outbound transitions are permitted. Transitions are enforced by the `VALID_TRANSITIONS` map in the PATCH endpoint, while `queued -> running` is performed exclusively by the scheduler/runner internally. All commands now require a `providerId` for execution.
 
 ## 2. Source of Truth
 
 - **Transition rules:** `src/app/api/commands/[id]/route.ts:6-11` -- the `VALID_TRANSITIONS` constant.
-- **Runner state changes:** `src/lib/claude-runner.ts:88-93` (queued->running), `src/lib/claude-runner.ts:131-148` (running->completed/failed).
+- **Runner state changes:** `src/lib/claude-runner.ts:169-174` (queued->running), `src/lib/claude-runner.ts:223-229` (running->completed/failed).
 - **Orphan recovery:** `src/lib/scheduler.ts:57-82` (running->failed on restart).
 - **Related architecture:** `/llmdoc/architecture/commands-scheduler-architecture.md`
 
@@ -28,7 +28,7 @@ Commands follow a strict state machine with 6 states: `pending`, `queued`, `runn
 
 | Transition | Side Effect |
 |---|---|
-| `* -> running` | Sets `pid`, `logFile`, `startedAt`; registers in `runningProcesses` Map |
+| `* -> running` | Sets `pid`, `logFile`, `startedAt`, `execEnv`; registers in `runningProcesses` Map |
 | `* -> completed` | Sets `result`, `sessionId`, `finishedAt`; clears `pid`; may update task status to `ready` |
 | `* -> failed` | Sets `result`, `finishedAt`; clears `pid` |
 | `running -> aborted` | Sends SIGTERM to pid, SIGKILL after 5s; sets `finishedAt` |
