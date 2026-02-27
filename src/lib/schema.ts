@@ -38,6 +38,11 @@ export const commands = sqliteTable('commands', {
   createdAt: text('created_at').default(sql`(datetime('now'))`),
 });
 
+export const config = sqliteTable('config', {
+  key: text('key').primaryKey(),
+  value: text('value').notNull(),
+});
+
 // Relations for query API
 export const projectsRelations = relations(projects, ({ many }) => ({
   tasks: many(tasks),
