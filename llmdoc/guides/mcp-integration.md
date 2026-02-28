@@ -1,28 +1,28 @@
-# How to Configure, Extend, or Debug the MCP Integration
+# 如何配置、扩展或调试 MCP 集成
 
-Operational guide for working with the MCP feedback loop. See `/llmdoc/architecture/mcp-feedback-loop.md` for the full architecture.
+MCP 反馈循环的操作指南。完整架构请参见 `/llmdoc/architecture/mcp-feedback-loop.md`。
 
-## Configure the MCP Server
+## 配置 MCP 服务器
 
-1. **Verify config:** `mcp-config.json` defines a single `dispatch` server with `"type": "http"` and `"url": "http://localhost:3000/api/mcp"`. If your app runs on a different port, update the URL.
-2. **Verify config detection:** `src/lib/claude-runner.ts:88-91` checks for `mcp-config.json` at `process.cwd()`. Ensure the app is started from the project root, or the MCP tools will silently not load.
-3. **No separate server process needed:** The MCP endpoint is embedded in the Next.js app (`src/app/api/mcp/route.ts`). As long as the Next.js app is running, the MCP server is available.
+1. **验证配置：** `mcp-config.json` 定义了一个 `dispatch` 服务器，类型为 `"type": "http"`，URL 为 `"http://localhost:3000/api/mcp"`。若应用运行在不同端口，请更新 URL。
+2. **验证配置检测：** `src/lib/claude-runner.ts:88-91` 在 `process.cwd()` 处检查 `mcp-config.json`。确保应用从项目根目录启动，否则 MCP 工具将静默不加载。
+3. **无需单独的服务器进程：** MCP 端点已嵌入 Next.js 应用（`src/app/api/mcp/route.ts`）。只要 Next.js 应用在运行，MCP 服务器即可用。
 
-## Add a New MCP Tool
+## 添加新 MCP 工具
 
-1. **Define the tool** in `src/app/api/mcp/route.ts` inside the `createServer()` function using `server.registerTool()`. Follow the existing pattern: define `description`, `inputSchema` (zod), and an async handler that directly queries/mutates the DB via Drizzle ORM.
-2. **Test the tool** by creating a task whose prompt instructs Claude to use the new tool name. Check the NDJSON log file in `./logs/<commandId>.ndjson` for tool invocation traces.
+1. **定义工具：** 在 `src/app/api/mcp/route.ts` 的 `createServer()` 函数中使用 `server.registerTool()` 定义工具。遵循现有模式：定义 `description`、`inputSchema`（zod）以及直接通过 Drizzle ORM 查询/修改数据库的异步处理器。
+2. **测试工具：** 创建一个提示词指示 Claude 使用新工具名称的任务。检查 `./logs/<commandId>.ndjson` 中的 NDJSON 日志文件，查看工具调用痕迹。
 
-## Debug MCP Communication
+## 调试 MCP 通信
 
-1. **Check if MCP is injected:** Search the command's NDJSON log (`./logs/<commandId>.ndjson`) for MCP-related events. If absent, verify `mcp-config.json` exists at the project root.
-2. **Verify app is running:** The MCP tools are served by the Next.js app at `/api/mcp`. If the app is not running, all tool calls will fail. Unlike the old stdio transport, the MCP server does not run as a separate process.
-3. **Inspect HTTP transport:** The endpoint handles `POST`, `GET`, and `DELETE` requests. Tool calls arrive as `POST` requests. The transport is stateless (`sessionIdGenerator: undefined`), so each request is independent.
-4. **Check DB access:** MCP tools now operate directly on the database. If tools return errors, check that the SQLite database is accessible and not locked.
+1. **检查 MCP 是否已注入：** 在命令的 NDJSON 日志（`./logs/<commandId>.ndjson`）中搜索 MCP 相关事件。若没有，请确认项目根目录存在 `mcp-config.json`。
+2. **确认应用在运行：** MCP 工具由位于 `/api/mcp` 的 Next.js 应用提供服务。若应用未运行，所有工具调用都将失败。MCP 服务器嵌入在 Next.js 应用中，不作为独立进程运行。
+3. **检查 HTTP 传输：** 端点处理 `POST`、`GET` 和 `DELETE` 请求。工具调用以 `POST` 请求到达。传输是无状态的（`sessionIdGenerator: undefined`），因此每个请求都是独立的。
+4. **检查数据库访问：** MCP 工具现在直接操作数据库。若工具返回错误，请检查 SQLite 数据库是否可访问且未被锁定。
 
-## Common Issues
+## 常见问题
 
-- **Tools not available to Claude:** `mcp-config.json` not found at `process.cwd()`. Ensure the app launches from the project root.
-- **All tool calls fail:** The Next.js app is not running. The MCP endpoint (`/api/mcp`) is part of the app -- start the app first.
-- **`update_command` does not enforce state machine:** Note that the MCP `update_command` tool performs a direct DB update without state machine validation (unlike the REST `PATCH /api/commands/:id` endpoint). Exercise caution with status transitions.
-- **Recursive task creation runs away:** No built-in depth limit exists. Monitor task count via `list_tasks` or add a depth check in the `create_task` handler.
+- **工具对 Claude 不可用：** `mcp-config.json` 在 `process.cwd()` 处未找到。确保应用从项目根目录启动。
+- **所有工具调用失败：** Next.js 应用未在运行。MCP 端点（`/api/mcp`）是应用的一部分——请先启动应用。
+- **`update_command` 未强制状态机：** 注意 MCP `update_command` 工具执行的是直接数据库更新，不进行状态机验证（与 REST `PATCH /api/commands/:id` 端点不同）。进行状态转换时请谨慎。
+- **递归任务创建失控：** 没有内置的深度限制。通过 `list_tasks` 监控任务数量，或在 `create_task` 处理器中添加深度检查。

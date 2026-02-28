@@ -1,47 +1,47 @@
-# Git Conventions
+# Git 规范
 
-This document provides a high-level summary and pointers to source-of-truth information for the project's git workflow and commit conventions.
+本文档提供项目 git 工作流和提交规范的高层摘要及权威来源指针。
 
-## 1. Core Summary
+## 1. 核心摘要
 
-The project uses a single `main` branch with linear history (no feature branches observed). All commits follow Conventional Commits format with a mandatory `Co-Authored-By` trailer for Claude Code contributions. Task-level isolation is achieved via **git worktrees** rather than branches, with each task getting a dedicated worktree under `<project-work-dir>/.worktrees/`.
+项目使用单一 `main` 分支，采用线性历史（未观察到功能分支）。所有提交遵循约定式提交（Conventional Commits）格式，Claude Code 贡献的提交必须附带 `Co-Authored-By` trailer。任务级别的隔离通过 **git 工作树（worktree）** 而非分支来实现，每个任务在 `<project-work-dir>/.worktrees/` 下拥有专用工作树。
 
-## 2. Branch Strategy
+## 2. 分支策略
 
-- **Primary branch:** `main` (only branch; no remote feature branches).
-- **Task isolation:** Git worktrees are used instead of feature branches. Each task creates a worktree at `<projectWorkDir>/.worktrees/<taskDir>`. See `docs/initial-design.md` for the design rationale.
-- **Worktree lifecycle:** Created during task initialization (triggered manually via `/api/tasks/:id/init`), deleted via `cleanupTask()` when the task or project is removed.
+- **主分支：** `main`（唯一分支，无远程功能分支）。
+- **任务隔离：** 使用 git 工作树代替功能分支。每个任务在 `<projectWorkDir>/.worktrees/<taskDir>` 处创建工作树。设计原理详见 `docs/initial-design.md`。
+- **工作树生命周期：** 在任务初始化时（通过 `/api/tasks/:id/init` 手动触发）创建，在任务或项目被删除时通过 `cleanupTask()` 删除。清理时也会删除工作树关联的分支（保护 main/master/develop）。
 
-## 3. Commit Message Format
+## 3. 提交消息格式
 
-All commits use **Conventional Commits** (`<type>: <description>`).
+所有提交使用**约定式提交（Conventional Commits）**格式（`<type>: <description>`）。
 
-| Prefix   | Usage                                        | Example from history                                    |
+| 前缀 | 用途 | 历史示例 |
 |----------|----------------------------------------------|---------------------------------------------------------|
-| `feat:`  | New feature or capability                    | `feat: add settings page and system config API`         |
-| `fix:`   | Bug fix or correction                        | `fix: consume config from DB and deduplicate config keys`|
-| `chore:` | Tooling, config, non-functional changes      | `chore: initialize Next.js project with shadcn/ui`      |
-| `docs:`  | Documentation only                           | `docs: add detailed implementation plan`                |
+| `feat:` | 新功能或能力 | `feat: add settings page and system config API` |
+| `fix:` | 缺陷修复或更正 | `fix: consume config from DB and deduplicate config keys` |
+| `chore:` | 工具、配置、非功能性变更 | `chore: initialize Next.js project with shadcn/ui` |
+| `docs:` | 仅文档变更 | `docs: add detailed implementation plan` |
 
-**Rules inferred from history:**
-- Subject line is imperative mood, lowercase after prefix.
-- Parenthetical detail may follow for context (e.g., `fix: migrate MCP server to registerTool API (fix deprecation warnings)`).
-- No scope convention (e.g., `feat(api):`) is used; subjects are kept flat.
+**从历史推断的规则：**
+- 主题行使用祈使语气，前缀后小写。
+- 可在括号内附加上下文说明（如 `fix: migrate MCP server to registerTool API (fix deprecation warnings)`）。
+- 不使用 scope 约定（如 `feat(api):`），主题保持扁平。
 
-## 4. Co-Author Pattern
+## 4. 共同作者模式（Co-Author Pattern）
 
-Every commit includes the trailer:
+每次提交包含 trailer：
 
 ```
 Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
 ```
 
-This is appended automatically when Claude Code creates commits.
+当 Claude Code 创建提交时自动追加。
 
-## 5. Source of Truth
+## 5. 权威来源
 
-- **Worktree design:** `docs/initial-design.md` - Task initialization and worktree creation flow.
-- **Worktree runtime usage:** `src/lib/claude-runner.ts:66-67` - Resolves `worktreeDir` for command execution.
-- **Worktree detection after init:** `src/lib/claude-runner.ts:239-261` - Scans `.worktrees/` by creation time, excluding dirs assigned to other tasks.
-- **Worktree cleanup:** `src/lib/claude-runner.ts:44-48` - `cleanupTask()` runs `git worktree remove --force`.
-- **Gitignore for worktrees:** `.gitignore` - Excludes `.worktrees/` from version control.
+- **工作树设计：** `docs/initial-design.md` - 任务初始化和工作树创建流程。
+- **工作树运行时使用：** `src/lib/claude-runner.ts:66-67` - 解析命令执行的 `worktreeDir`。
+- **初始化后的工作树检测：** `src/lib/claude-runner.ts:239-261` - 按创建时间扫描 `.worktrees/`，排除已分配给其他任务的目录。
+- **工作树清理：** `src/lib/claude-runner.ts:43-86` - `cleanupTask()` 执行 4 步清理：（1）通过 `git -C <worktreeDir>` 检测分支名，（2）通过 `git -C <mainRepoDir> worktree remove --force` 移除工作树，（3）通过 `git worktree prune` 清理陈旧元数据，（4）通过 `git branch -D` 删除分支（保护 main/master/develop）。工作树移除失败时回退到 `rmSync`。
+- **工作树的 gitignore：** `.gitignore` - 将 `.worktrees/` 从版本控制中排除。

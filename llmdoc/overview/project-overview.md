@@ -1,61 +1,61 @@
 # Claude Dispatch
 
-## 1. Identity
+## 1. 系统定位
 
-- **What it is:** A Next.js web application for remotely dispatching tasks to Claude Code CLI processes running on an ECS server, with real-time monitoring and an MCP-based feedback loop.
-- **Purpose:** Enables users to manage AI-driven coding tasks through a mobile-first web UI, orchestrating Claude Code execution across isolated git worktrees with priority-based scheduling, concurrent execution control, and configurable provider profiles.
+- **是什么：** 一个 Next.js Web 应用，用于向运行在 ECS 服务器上的 Claude Code CLI 进程远程派发任务，具备实时监控和基于 MCP 的反馈循环。
+- **用途：** 让用户通过移动端优先的 Web UI 管理 AI 驱动的编码任务，在隔离的 git 工作树（worktree）上编排 Claude Code 的执行，支持基于优先级的调度、并发执行控制和可配置的服务商配置文件。
 
-## 2. High-Level Description
+## 2. 高层描述
 
-Claude Dispatch is a task orchestration system built on a three-tier entity hierarchy: **Projects** (git repositories) contain **Tasks** (units of work with isolated git worktrees), which contain **Commands** (individual Claude Code invocations with prompt, status, and results). **Provider Profiles** supply named API credential configurations injected into CLI subprocesses. A polling scheduler consumes queued commands, spawns `claude` CLI subprocesses with the selected provider's environment, and manages their lifecycle including timeout enforcement (SIGTERM/SIGKILL). Real-time UI updates flow through SSE (Server-Sent Events) with 2-second database polling for change detection.
+Claude Dispatch 是一个基于三层实体层级构建的任务编排系统：**项目（Projects）**（git 仓库）包含**任务（Tasks）**（具有隔离 git 工作树的工作单元），任务包含**命令（Commands）**（单次 Claude Code 调用，含提示词、状态和结果）。**服务商配置文件（Provider Profiles）** 提供命名的 API 凭证配置，注入到 CLI 子进程中。轮询调度器消费排队的命令，使用所选服务商的环境变量生成 `claude` CLI 子进程，并管理其生命周期，包括超时强制执行（SIGTERM/SIGKILL）。实时 UI 更新通过 SSE（服务器发送事件）流式推送，使用 2 秒数据库轮询检测变更。
 
-## 3. Tech Stack
+## 3. 技术栈
 
-| Layer | Technology |
+| 层级 | 技术 |
 |---|---|
-| Framework | Next.js 16.1 (App Router, all client-rendered pages) |
-| UI | React 19, shadcn/ui (Radix UI), Tailwind CSS 4, Lucide icons |
-| Database | SQLite via better-sqlite3 + Drizzle ORM (WAL mode) |
-| AI Integration | Claude Code CLI (spawned as subprocess, NDJSON stream parsing) |
-| MCP | `@modelcontextprotocol/sdk` 1.27 - Streamable HTTP transport, embedded as Next.js API route (`/api/mcp`) |
-| Drag & Drop | `@dnd-kit/core` + `@dnd-kit/sortable` (provider reordering) |
-| Validation | Zod 4 |
-| Package Manager | pnpm |
-| Language | TypeScript 5 |
+| 框架 | Next.js 16.1（App Router，所有页面均为客户端渲染） |
+| UI | React 19、shadcn/ui（Radix UI）、Tailwind CSS 4、Lucide 图标、sonner（toast 通知） |
+| 数据库 | SQLite，通过 better-sqlite3 + Drizzle ORM（WAL 模式） |
+| AI 集成 | Claude Code CLI（作为子进程生成，NDJSON 流解析） |
+| MCP | `@modelcontextprotocol/sdk` 1.27 - Streamable HTTP 传输，作为 Next.js API 路由（`/api/mcp`）嵌入 |
+| 拖放 | `@dnd-kit/core` + `@dnd-kit/sortable`（服务商排序） |
+| 验证 | Zod 4 |
+| 包管理器 | pnpm |
+| 语言 | TypeScript 5 |
 
-## 4. Entity Hierarchy
+## 4. 实体层级
 
 ```
-Projects (git repo registration)
-  └── Tasks (isolated git worktree per task)
-        └── Commands (single claude CLI invocation)
-              Status: pending → queued → running → completed/failed/aborted
+项目 Projects（git 仓库注册）
+  └── 任务 Tasks（每个任务一个隔离的 git 工作树）
+        └── 命令 Commands（单次 claude CLI 调用）
+              状态: pending → queued → running → completed/failed/aborted
 
-Providers (named API credential profiles, sorted by sortOrder)
-  └── Referenced by Commands (providerId) and Tasks (lastProviderId)
+服务商 Providers（命名 API 凭证配置文件，按 sortOrder 排序）
+  └── 被 Commands（providerId）和 Tasks（lastProviderId）引用
 ```
 
-- `src/lib/schema.ts` (`projects`, `tasks`, `commands`, `providers`, `config`) - Drizzle ORM table definitions.
-- Relations are one-to-many at each level. Cascade delete flows top-down via `cleanupTask()`.
+- `src/lib/schema.ts`（`projects`、`tasks`、`commands`、`providers`、`config`）- Drizzle ORM 表定义。
+- 各层级之间为一对多关系。级联删除通过 `cleanupTask()` 自顶向下流转。
 
-## 5. Key Architectural Patterns
+## 5. 关键架构模式
 
-**Provider Profiles:** `src/lib/schema.ts` (`providers`) stores named configurations with free-form env key-value pairs. Provider is required for all commands -- no default environment fallback. Runner clears conflicting env vars then injects provider's `envJson` before spawning CLI.
+**服务商配置文件（Provider Profiles）：** `src/lib/schema.ts`（`providers`）存储带自由格式环境键值对的命名配置。所有命令都必须有服务商——不存在默认环境变量兜底。Runner 在生成 CLI 之前清除冲突的环境变量，然后注入服务商的 `envJson`。
 
-**Manual Task Initialization:** Tasks start in `pending` status. User manually triggers init via `POST /api/tasks/:id/init` with chosen provider. Flow: `pending -> initializing -> researching -> ready`.
+**手动任务初始化：** 任务以 `pending` 状态创建。用户通过 `POST /api/tasks/:id/init` 手动触发初始化，并选择服务商。流程：`pending -> initializing -> researching -> ready`。
 
-**Scheduler Polling Loop:** `src/lib/scheduler.ts` (`tick`) polls DB every N seconds for `queued` commands, respects `max_concurrent` limit and per-task serial execution constraint. Lazily initialized on first HTTP request via `src/lib/init.ts`.
+**调度器轮询循环：** `src/lib/scheduler.ts`（`tick`）每隔 N 秒轮询数据库查找 `queued` 状态的命令，遵守 `max_concurrent` 限制和每任务串行执行约束。通过 `src/lib/init.ts` 在首次 HTTP 请求时懒加载初始化。
 
-**SSE Real-Time Updates:** `src/app/api/events/route.ts` maintains SSE connections, polls active commands every 2s, pushes change notifications. Client-side `src/hooks/use-commands.ts` receives SSE events then re-fetches full command list (including `providerName`) via REST for consistency.
+**SSE 实时更新：** `src/app/api/events/route.ts` 维护 SSE 连接，每 2 秒轮询活跃命令，推送变更通知。客户端 `src/hooks/use-commands.ts` 接收 SSE 事件后通过 REST 重新获取完整命令列表（包括 `providerName`）以保证一致性。
 
-**MCP Feedback Loop:** `src/app/api/mcp/route.ts` exposes 4 tools (`create_task`, `update_command`, `get_task_context`, `list_tasks`) to Claude subprocesses via Streamable HTTP MCP (stateless mode). Tools operate directly on the SQLite database. This enables Claude to self-decompose tasks, report progress, and query context.
+**MCP 反馈循环：** `src/app/api/mcp/route.ts` 通过 Streamable HTTP MCP（无状态模式）向 Claude 子进程暴露 4 个工具（`create_task`、`update_command`、`get_task_context`、`list_tasks`）。这些工具直接操作 SQLite 数据库，使 Claude 能够自我分解任务、汇报进度和查询上下文。
 
-**Session Continuity:** `src/lib/claude-runner.ts` (`runCommand`) automatically passes `--resume <sessionId>` from the previous command in the same task, enabling multi-turn conversation across commands.
+**会话连续性（Session Continuity）：** `src/lib/claude-runner.ts`（`runCommand`）自动传递同一任务中前一条命令的 `--resume <sessionId>`，实现跨命令的多轮对话。
 
-**Execution Environment Audit:** Each command records a sanitized `execEnv` JSON blob (provider name, cwd, CLI args, masked env vars) for debugging.
+**执行环境审计（Execution Environment Audit）：** 每条命令记录经脱敏处理的 `execEnv` JSON 对象（服务商名称、工作目录、CLI 参数、已脱敏环境变量），用于调试。
 
-## 6. Mobile-First Responsive Design
+## 6. 移动端优先响应式设计
 
-- `src/components/nav/app-shell.tsx` (`AppShell`) - Uses `useIsMobile()` (768px breakpoint) to toggle between `BottomTabs` (mobile) and `Sidebar` (desktop).
-- All pages are `'use client'` components. UI language is Simplified Chinese.
-- 6 routes: `/` (command queue with project/task filtering), `/projects`, `/projects/[id]`, `/tasks/[id]`, `/commands/[id]`, `/settings`.
+- `src/components/nav/app-shell.tsx`（`AppShell`）- 使用 `useIsMobile()`（768px 断点）在 `BottomTabs`（移动端）和 `Sidebar`（桌面端）之间切换。
+- 所有页面均为 `'use client'` 组件，界面语言为简体中文（zh-CN）。
+- 共 6 个路由：`/`（命令队列，含项目/任务筛选）、`/projects`、`/projects/[id]`、`/tasks/[id]`、`/commands/[id]`、`/settings`。

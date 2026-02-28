@@ -1,37 +1,37 @@
-# Configuration Keys Reference
+# 配置键参考
 
-This document provides a summary of all runtime configuration keys and pointers to their source of truth.
+本文档提供所有运行时配置键的摘要及其来源指针。
 
-## 1. Core Summary
+## 1. 核心摘要
 
-The system uses a DB-backed configuration table (`config`) with in-code defaults. Configuration is read via `getConfig(key)` and written via `setConfig(key, value)`. All values are stored as strings. The PATCH API validates numeric keys separately from string keys.
+系统使用由数据库支撑的配置表（`config`），并在代码中设有默认值。通过 `getConfig(key)` 读取配置，通过 `setConfig(key, value)` 写入配置。所有值均以字符串形式存储。PATCH API 对数字键和字符串键分别进行验证。
 
-## 2. Source of Truth
+## 2. 权威来源
 
-- **Primary Code:** `src/lib/config.ts` (`CONFIG_DEFAULTS`, `getConfig`, `setConfig`, `getAllConfig`) - All default values and the read/write logic.
-- **API Route:** `src/app/api/system/config/route.ts` (`GET`, `PATCH`) - REST interface for reading and updating config.
-- **Schema:** `src/lib/schema.ts` (`config`) - The SQLite table definition (key-value pairs).
-- **Related Architecture:** `/llmdoc/architecture/tasks-architecture.md` - How `init_prompt` and `research_prompt` are used in the task pipeline.
-- **Related Architecture:** `/llmdoc/architecture/commands-scheduler-architecture.md` - How `max_concurrent`, `poll_interval`, `command_timeout` govern scheduling.
+- **主要代码：** `src/lib/config.ts`（`CONFIG_DEFAULTS`、`getConfig`、`setConfig`、`getAllConfig`）- 所有默认值及读写逻辑。
+- **API 路由：** `src/app/api/system/config/route.ts`（`GET`、`PATCH`）- 读取和更新配置的 REST 接口。
+- **数据模式：** `src/lib/schema.ts`（`config`）- SQLite 表定义（键值对）。
+- **相关架构：** `/llmdoc/architecture/tasks-architecture.md` - `init_prompt` 和 `research_prompt` 在任务流水线中的使用方式。
+- **相关架构：** `/llmdoc/architecture/commands-scheduler-architecture.md` - `max_concurrent`、`poll_interval`、`command_timeout` 如何控制调度。
 
-## 3. Configuration Keys
+## 3. 配置键
 
-| Key | Type | Default | Description |
+| 键名 | 类型 | 默认值 | 描述 |
 |-----|------|---------|-------------|
-| `max_concurrent` | numeric | `2` | Maximum concurrent running commands across all tasks |
-| `command_timeout` | numeric | `1800` | Seconds before a running command is killed (SIGTERM) |
-| `poll_interval` | numeric | `5` | Scheduler tick interval in seconds (minimum: 1) |
-| `log_retention_days` | numeric | `30` | Log file retention period in days |
-| `init_prompt` | string | *(see below)* | Template for task init commands. Placeholders: `{workDir}`, `{description}` |
-| `research_prompt` | string | *(see below)* | Template for task research commands. Placeholders: `{description}` |
+| `max_concurrent` | 数字 | `2` | 所有任务中最大并发运行命令数 |
+| `command_timeout` | 数字 | `1800` | 运行中命令被终止（SIGTERM）之前的秒数 |
+| `poll_interval` | 数字 | `5` | 调度器 tick 间隔（秒），最小值：1 |
+| `log_retention_days` | 数字 | `30` | 日志文件保留天数 |
+| `init_prompt` | 字符串 | *（见下文）* | 任务 init 命令的模板。占位符：`{workDir}`、`{description}` |
+| `research_prompt` | 字符串 | *（见下文）* | 任务 research 命令的模板。占位符：`{description}` |
 
-The `init_prompt` is used by `src/app/api/tasks/[id]/init/route.ts:35-38` when manually triggering init. The `research_prompt` is used by `src/lib/claude-runner.ts:272-273` when auto-creating the research command after init success.
+`init_prompt` 由 `src/app/api/tasks/[id]/init/route.ts:35-38` 在手动触发 init 时使用。`research_prompt` 由 `src/lib/claude-runner.ts:272-273` 在 init 成功后自动创建 research 命令时使用。
 
-## 4. API Validation Rules
+## 4. API 验证规则
 
-The PATCH endpoint at `src/app/api/system/config/route.ts:13-44` enforces:
+`src/app/api/system/config/route.ts:13-44` 中的 PATCH 端点强制执行以下规则：
 
-- Only keys in `CONFIG_KEYS` are accepted (400 otherwise).
-- Numeric keys (`max_concurrent`, `command_timeout`, `log_retention_days`, `poll_interval`) must be non-negative numbers.
-- `poll_interval` has additional minimum constraint: must be >= 1.
-- String keys (`init_prompt`, `research_prompt`) accept any string value.
+- 仅接受 `CONFIG_KEYS` 中的键（否则返回 400）。
+- 数字键（`max_concurrent`、`command_timeout`、`log_retention_days`、`poll_interval`）必须为非负数。
+- `poll_interval` 有额外的最小值约束：必须 >= 1。
+- 字符串键（`init_prompt`、`research_prompt`）接受任意字符串值。
