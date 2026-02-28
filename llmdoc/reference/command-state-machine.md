@@ -8,11 +8,11 @@
 
 ## 2. 权威来源
 
-- **转换规则：** `src/app/api/commands/[id]/route.ts:6-11` -- `VALID_TRANSITIONS` 常量。
-- **DELETE 端点：** `src/app/api/commands/[id]/route.ts:110-121` -- 仅删除 pending 状态的命令。
-- **待处理编辑支持：** `src/app/api/commands/[id]/route.ts:94-99` -- 允许 pending 时 PATCH prompt、mode、providerId。
-- **Runner 状态变更：** `src/lib/claude-runner.ts:169-174`（queued->running）、`src/lib/claude-runner.ts:223-229`（running->completed/failed）。
-- **孤儿恢复：** `src/lib/scheduler.ts:57-82`（重启时 running->failed）。
+- **转换规则：** `src/app/api/commands/[id]/route.ts` -- `VALID_TRANSITIONS` 常量。
+- **DELETE 端点：** `src/app/api/commands/[id]/route.ts` -- 仅删除 pending 状态的命令。
+- **待处理编辑支持：** `src/app/api/commands/[id]/route.ts` -- 允许 pending 时 PATCH prompt、mode、providerId。
+- **Runner 状态变更：** `src/lib/claude-runner.ts`（queued->running、running->completed/failed）。
+- **孤儿恢复：** `src/lib/scheduler.ts`（重启时 running->failed）。
 - **相关架构：** `/llmdoc/architecture/commands-scheduler-architecture.md`
 
 ## 3. 状态转换表
@@ -31,7 +31,7 @@
 | 转换 | 副作用 |
 |---|---|
 | `* -> running` | 设置 `pid`、`logFile`、`startedAt`、`execEnv`；注册到 `runningProcesses` Map |
-| `* -> completed` | 设置 `result`、`sessionId`、`finishedAt`；清除 `pid`；可能将任务状态更新为 `ready` |
+| `* -> completed` | 设置 `result`、`sessionId`、`finishedAt`；清除 `pid` |
 | `* -> failed` | 设置 `result`、`finishedAt`；清除 `pid` |
 | `running -> aborted` | 向 pid 发送 SIGTERM，5 秒后发送 SIGKILL；设置 `finishedAt` |
 | `pending -> (delete)` | 从数据库完全移除命令行（DELETE 端点） |

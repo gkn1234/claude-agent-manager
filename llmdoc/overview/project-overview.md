@@ -27,7 +27,7 @@ Claude Dispatch 是一个基于三层实体层级构建的任务编排系统：*
 
 ```
 项目 Projects（git 仓库注册）
-  └── 任务 Tasks（每个任务一个隔离的 git 工作树）
+  └── 任务 Tasks（每个任务一个隔离的 git 工作树，创建时原子生成）
         └── 命令 Commands（单次 claude CLI 调用）
               状态: pending → queued → running → completed/failed/aborted
 
@@ -35,14 +35,14 @@ Claude Dispatch 是一个基于三层实体层级构建的任务编排系统：*
   └── 被 Commands（providerId）和 Tasks（lastProviderId）引用
 ```
 
-- `src/lib/schema.ts`（`projects`、`tasks`、`commands`、`providers`、`config`）- Drizzle ORM 表定义。
+- `src/lib/schema.ts`（`projects`、`tasks`、`commands`、`providers`、`config`）- Drizzle ORM 表定义。任务表无 `status` 字段，`branch` 为必填。
 - 各层级之间为一对多关系。级联删除通过 `cleanupTask()` 自顶向下流转。
 
 ## 5. 关键架构模式
 
 **服务商配置文件（Provider Profiles）：** `src/lib/schema.ts`（`providers`）存储带自由格式环境键值对的命名配置。所有命令都必须有服务商——不存在默认环境变量兜底。Runner 在生成 CLI 之前清除冲突的环境变量，然后注入服务商的 `envJson`。
 
-**手动任务初始化：** 任务以 `pending` 状态创建。用户通过 `POST /api/tasks/:id/init` 手动触发初始化，并选择服务商。流程：`pending -> initializing -> researching -> ready`。
+**原子任务创建：** 任务创建时同步执行 git branch + worktree 创建。如果 branch/worktree 创建失败，任务不会被插入数据库。分支名可选填，不填则自动生成 `task-{uuid前缀}`，仅允许 `[a-z0-9-]` 字符。任务创建后即可接受命令，无需初始化流程。
 
 **调度器轮询循环：** `src/lib/scheduler.ts`（`tick`）每隔 N 秒轮询数据库查找 `queued` 状态的命令，遵守 `max_concurrent` 限制和每任务串行执行约束。通过 `src/lib/init.ts` 在首次 HTTP 请求时懒加载初始化。
 
@@ -53,6 +53,8 @@ Claude Dispatch 是一个基于三层实体层级构建的任务编排系统：*
 **会话连续性（Session Continuity）：** `src/lib/claude-runner.ts`（`runCommand`）自动传递同一任务中前一条命令的 `--resume <sessionId>`，实现跨命令的多轮对话。
 
 **执行环境审计（Execution Environment Audit）：** 每条命令记录经脱敏处理的 `execEnv` JSON 对象（服务商名称、工作目录、CLI 参数、已脱敏环境变量），用于调试。
+
+**共享命令输入组件：** `src/components/commands/command-input.tsx`（`CommandInput`）被任务详情页和命令详情页共用，提供服务商选择、Exec/Plan 模式切换、Draft/Queue 模式切换，以及偏好自动保存。
 
 ## 6. 移动端优先响应式设计
 

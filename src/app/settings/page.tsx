@@ -41,8 +41,6 @@ const CONFIG_ITEMS: ConfigItem[] = [
   { key: 'command_timeout', label: '指令超时时间', description: '单条指令的最大执行时间', unit: '秒', type: 'number' },
   { key: 'log_retention_days', label: '日志保留天数', description: '日志文件自动清理的保留天数', unit: '天', type: 'number' },
   { key: 'poll_interval', label: '轮询间隔', description: '调度器检查待执行指令的间隔', unit: '秒', type: 'number' },
-  { key: 'init_prompt', label: '初始化提示词', description: '可用占位符：{workDir}、{description}', type: 'text' },
-  { key: 'research_prompt', label: '调研提示词', description: '可用占位符：{description}', type: 'text' },
 ];
 
 // --- Provider Section ---

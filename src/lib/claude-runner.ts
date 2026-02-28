@@ -1,11 +1,9 @@
 import { spawn, ChildProcess, execFileSync } from 'child_process';
-import { createWriteStream, mkdirSync, existsSync, readdirSync, unlinkSync, statSync, rmSync } from 'fs';
+import { createWriteStream, mkdirSync, existsSync, unlinkSync, rmSync } from 'fs';
 import { join } from 'path';
 import { db } from './db';
 import { commands, tasks, projects, providers } from './schema';
 import { eq } from 'drizzle-orm';
-import { v4 as uuid } from 'uuid';
-import { getConfig } from './config';
 
 const LOG_DIR = process.env.LOG_DIR || './logs';
 
@@ -118,7 +116,7 @@ export async function runCommand(commandId: string): Promise<void> {
   ];
 
   // Add plan mode flag if needed
-  if (command.mode === 'plan' || command.mode === 'research' || command.mode === 'init') {
+  if (command.mode === 'plan') {
     args.push('--permission-mode', 'plan');
   }
 
@@ -128,19 +126,17 @@ export async function runCommand(commandId: string): Promise<void> {
     args.push('--mcp-config', mcpConfigPath);
   }
 
-  // Resume session if available (only for execute/plan commands, not init/research)
-  if (command.mode !== 'init' && command.mode !== 'research') {
-    const prevCommand = db.select()
-      .from(commands)
-      .where(eq(commands.taskId, command.taskId))
-      .all()
-      .filter(c => c.sessionId && c.id !== commandId && c.mode !== 'init')
-      .sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''))
-      .pop();
+  // Resume session if available
+  const prevCommand = db.select()
+    .from(commands)
+    .where(eq(commands.taskId, command.taskId))
+    .all()
+    .filter(c => c.sessionId && c.id !== commandId)
+    .sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''))
+    .pop();
 
-    if (prevCommand?.sessionId) {
-      args.push('--resume', prevCommand.sessionId);
-    }
+  if (prevCommand?.sessionId) {
+    args.push('--resume', prevCommand.sessionId);
   }
 
   // Build spawn environment with provider injection
@@ -306,69 +302,6 @@ export async function runCommand(commandId: string): Promise<void> {
       finishedAt: new Date().toISOString(),
     }).where(eq(commands.id, commandId)).run();
 
-    // If init command succeeded, find worktreeDir and create research command
-    if (code === 0 && command.mode === 'init') {
-      const taskData = db.select().from(tasks).where(eq(tasks.id, command.taskId)).get();
-      const projectData = db.select().from(projects).where(eq(projects.id, task.projectId)).get();
-      if (taskData && projectData) {
-        // Scan .worktrees/ to find the newly created worktree directory
-        const worktreesBase = join(projectData.workDir, '.worktrees');
-        let worktreeDir: string | null = null;
-        if (existsSync(worktreesBase)) {
-          try {
-            // Get existing worktree dirs already assigned to other tasks
-            const usedDirs = new Set(
-              db.select({ worktreeDir: tasks.worktreeDir }).from(tasks).all()
-                .map(t => t.worktreeDir)
-                .filter(Boolean)
-            );
-
-            const dirs = readdirSync(worktreesBase, { withFileTypes: true })
-              .filter(d => d.isDirectory())
-              .filter(d => !usedDirs.has(join(worktreesBase, d.name)))
-              .sort((a, b) => {
-                // Sort by creation time, newest first
-                const aTime = statSync(join(worktreesBase, a.name)).birthtimeMs;
-                const bTime = statSync(join(worktreesBase, b.name)).birthtimeMs;
-                return bTime - aTime;
-              });
-            if (dirs.length > 0) {
-              worktreeDir = join(worktreesBase, dirs[0].name);
-            }
-          } catch {}
-        }
-
-        // Update task: set worktreeDir and status to researching
-        db.update(tasks).set({
-          status: 'researching',
-          ...(worktreeDir ? { worktreeDir } : {}),
-          updatedAt: new Date().toISOString(),
-        }).where(eq(tasks.id, command.taskId)).run();
-
-        // Auto-create research command
-        const researchId = uuid();
-        const researchTemplate = getConfig('research_prompt');
-        const researchPrompt = researchTemplate.replace('{description}', taskData.description);
-
-        db.insert(commands).values({
-          id: researchId,
-          taskId: command.taskId,
-          prompt: researchPrompt,
-          mode: 'research',
-          status: 'queued',
-          priority: 10,
-          providerId: command.providerId,
-        }).run();
-      }
-    }
-
-    // If research command succeeded, update task status to ready
-    if (code === 0 && command.mode === 'research') {
-      db.update(tasks).set({
-        status: 'ready',
-        updatedAt: new Date().toISOString(),
-      }).where(eq(tasks.id, command.taskId)).run();
-    }
   });
 
   child.on('error', (err) => {

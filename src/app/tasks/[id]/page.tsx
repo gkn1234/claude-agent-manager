@@ -6,10 +6,8 @@ import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import { ArrowLeft, Send, Loader2, Play, Trash2, Square, Undo2, FileEdit } from 'lucide-react';
-import { toast } from 'sonner';
+import { ArrowLeft, Trash2, Square, Undo2, Play } from 'lucide-react';
+import { CommandInput } from '@/components/commands/command-input';
 
 interface Command {
   id: string;
@@ -27,9 +25,8 @@ interface Task {
   id: string;
   projectId: string;
   description: string;
-  branch: string | null;
+  branch: string;
   worktreeDir: string | null;
-  status: string;
   lastProviderId: string | null;
   lastMode: string | null;
   commands: Command[];
@@ -49,14 +46,6 @@ const statusConfig: Record<string, { label: string; variant: 'default' | 'second
   aborted: { label: '已中止', variant: 'outline' },
 };
 
-const taskStatusMap: Record<string, string> = {
-  pending: '待初始化',
-  initializing: '初始化中',
-  researching: '调研中',
-  ready: '就绪',
-  archived: '已归档',
-};
-
 export default function TaskPage() {
   const params = useParams();
   const router = useRouter();
@@ -65,41 +54,20 @@ export default function TaskPage() {
   const [task, setTask] = useState<Task | null>(null);
   const [providers, setProviders] = useState<Provider[]>([]);
   const [loading, setLoading] = useState(true);
-  const [prompt, setPrompt] = useState('');
-  const [mode, setMode] = useState<'execute' | 'plan'>('execute');
-  const [providerId, setProviderId] = useState<string | null>(null);
-  const [sending, setSending] = useState(false);
-  const [isDraft, setIsDraft] = useState(false);
-  const [initializing, setInitializing] = useState(false);
-  const [prefsLoaded, setPrefsLoaded] = useState(false);
 
   const fetchTask = useCallback(async () => {
     try {
       const res = await fetch(`/api/tasks/${taskId}`);
-      if (res.ok) {
-        const data = await res.json();
-        setTask(data);
-        if (!prefsLoaded) {
-          if (data.lastMode === 'plan' || data.lastMode === 'execute') setMode(data.lastMode);
-          if (data.lastProviderId) setProviderId(data.lastProviderId);
-          setPrefsLoaded(true);
-        }
-      }
+      if (res.ok) setTask(await res.json());
     } finally {
       setLoading(false);
     }
-  }, [taskId, prefsLoaded]);
+  }, [taskId]);
 
   const fetchProviders = useCallback(async () => {
     const res = await fetch('/api/providers');
-    if (res.ok) {
-      const data = await res.json();
-      setProviders(data);
-      if (!providerId && !prefsLoaded && data.length > 0) {
-        setProviderId(data[0].id);
-      }
-    }
-  }, [providerId, prefsLoaded]);
+    if (res.ok) setProviders(await res.json());
+  }, []);
 
   useEffect(() => {
     fetchTask();
@@ -108,66 +76,7 @@ export default function TaskPage() {
     return () => clearInterval(interval);
   }, [fetchTask, fetchProviders]);
 
-  const savePrefs = useCallback(async (newProviderId: string | null, newMode: string) => {
-    await fetch(`/api/tasks/${taskId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ lastProviderId: newProviderId, lastMode: newMode }),
-    });
-  }, [taskId]);
-
-  const handleModeChange = (newMode: 'execute' | 'plan') => {
-    setMode(newMode);
-    savePrefs(providerId, newMode);
-  };
-
-  const handleProviderChange = (newProviderId: string) => {
-    setProviderId(newProviderId);
-    savePrefs(newProviderId, mode);
-  };
-
-  const handleInit = async () => {
-    if (!providerId) return;
-    setInitializing(true);
-    try {
-      await fetch(`/api/tasks/${taskId}/init`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ providerId }),
-      });
-      fetchTask();
-    } finally {
-      setInitializing(false);
-    }
-  };
-
   const hasRunning = task?.commands.some(c => c.status === 'running') ?? false;
-  const isTaskReady = task?.status === 'ready';
-  const isTaskPending = task?.status === 'pending';
-  const noProvider = providers.length === 0;
-  const inputDisabled = hasRunning || !isTaskReady || noProvider;
-
-  const handleSend = async () => {
-    if (!prompt.trim() || !providerId) return;
-    if (!isDraft && inputDisabled) return;
-    setSending(true);
-    try {
-      const res = await fetch(`/api/tasks/${taskId}/commands`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt, mode, providerId, autoQueue: !isDraft }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({ error: '请求失败' }));
-        toast.error(data.error || `请求失败 (${res.status})`);
-        return;
-      }
-      setPrompt('');
-      fetchTask();
-    } finally {
-      setSending(false);
-    }
-  };
 
   const handleDelete = async () => {
     if (!confirm('确定要删除这个任务吗？将同时删除所有相关指令和日志。')) return;
@@ -239,26 +148,12 @@ export default function TaskPage() {
           <Button variant="ghost" size="sm" className="p-1" onClick={() => router.back()}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <Badge variant="outline">{taskStatusMap[task.status] || task.status}</Badge>
-          {task.branch && <span className="text-xs text-muted-foreground">{task.branch}</span>}
-          <div className="flex-1" />
+          <span className="text-sm font-medium flex-1 truncate">{task.description}</span>
           <Button variant="ghost" size="sm" className="p-1 text-destructive hover:text-destructive" onClick={handleDelete}>
             <Trash2 className="h-4 w-4" />
           </Button>
         </div>
-        <Dialog>
-          <DialogTrigger asChild>
-            <p className="text-sm truncate cursor-pointer hover:text-foreground/80 transition-colors">{task.description}</p>
-          </DialogTrigger>
-          <DialogContent className="max-h-[80vh] flex flex-col">
-            <DialogHeader>
-              <DialogTitle>任务描述</DialogTitle>
-            </DialogHeader>
-            <div className="overflow-y-auto whitespace-pre-wrap text-sm">
-              {task.description}
-            </div>
-          </DialogContent>
-        </Dialog>
+        <p className="text-xs text-muted-foreground font-mono ml-8">{task.branch}</p>
       </div>
 
       {/* Command Timeline */}
@@ -359,8 +254,6 @@ export default function TaskPage() {
                     <p className="text-sm line-clamp-2">{cmd.prompt.slice(0, 120)}</p>
                     <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
                       {cmd.mode === 'plan' && <Badge variant="outline" className="text-xs">Plan</Badge>}
-                      {cmd.mode === 'init' && <Badge variant="outline" className="text-xs">Init</Badge>}
-                      {cmd.mode === 'research' && <Badge variant="outline" className="text-xs">调研</Badge>}
                       {cmd.providerId && (() => {
                         const prov = providers.find(p => p.id === cmd.providerId);
                         return prov ? <span>{prov.name}</span> : null;
@@ -377,96 +270,13 @@ export default function TaskPage() {
 
       {/* Input Area */}
       <div className="border-t px-4 py-3">
-        {noProvider && (
-          <p className="text-xs text-destructive mb-2">
-            尚未配置 Provider，请先前往<Link href="/settings" className="underline ml-0.5">系统设置</Link>添加
-          </p>
-        )}
-
-        {/* Pending: show init controls */}
-        {isTaskPending && !noProvider && (
-          <div className="flex items-center gap-2">
-            <select
-              value={providerId || ''}
-              onChange={(e) => handleProviderChange(e.target.value)}
-              className="h-8 rounded-md border bg-background px-2 text-xs cursor-pointer"
-            >
-              {providers.map((p) => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
-            </select>
-            <Button size="sm" onClick={handleInit} disabled={!providerId || initializing}>
-              <Play className="h-3.5 w-3.5 mr-1" />
-              {initializing ? '初始化中...' : '开始初始化'}
-            </Button>
-          </div>
-        )}
-
-        {/* Initializing / Researching: show progress */}
-        {!isTaskPending && !isTaskReady && (
-          <>
-            {hasRunning ? (
-              <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
-                <Loader2 className="h-3 w-3 animate-spin" /> 有指令正在执行中...
-              </p>
-            ) : (
-              <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
-                <Loader2 className="h-3 w-3 animate-spin" /> 任务{task.status === 'initializing' ? '初始化' : '调研'}中，请等待完成后再派发指令...
-              </p>
-            )}
-          </>
-        )}
-
-        {/* Ready: show command input */}
-        {isTaskReady && (
-          <>
-            <div className="flex items-center gap-2 mb-2">
-              <select
-                value={providerId || ''}
-                onChange={(e) => handleProviderChange(e.target.value)}
-                disabled={inputDisabled}
-                className="h-7 rounded-md border bg-background px-2 text-xs cursor-pointer disabled:opacity-50"
-              >
-                {providers.map((p) => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </select>
-              <div className="flex-1" />
-              <ToggleGroup type="single" variant="outline" size="sm" value={mode} onValueChange={(v) => v && handleModeChange(v as 'execute' | 'plan')}>
-                <ToggleGroupItem value="execute">Exec</ToggleGroupItem>
-                <ToggleGroupItem value="plan">Plan</ToggleGroupItem>
-              </ToggleGroup>
-              <ToggleGroup type="single" variant="outline" size="sm" value={isDraft ? 'draft' : 'queue'} onValueChange={(v) => v && setIsDraft(v === 'draft')}>
-                <ToggleGroupItem value="queue">排队</ToggleGroupItem>
-                <ToggleGroupItem value="draft">草稿</ToggleGroupItem>
-              </ToggleGroup>
-            </div>
-
-            <div className="flex gap-2">
-              <Textarea
-                placeholder={!isDraft && inputDisabled ? (hasRunning ? '等待当前指令完成...' : '等待任务就绪...') : '输入指令...'}
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-                disabled={!isDraft && inputDisabled}
-                rows={2}
-                className="resize-none text-sm"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleSend();
-                }}
-              />
-              <Button
-                size="sm"
-                variant={isDraft ? 'outline' : 'default'}
-                onClick={handleSend}
-                disabled={!prompt.trim() || (!isDraft && inputDisabled) || !providerId || sending}
-                title={isDraft ? '保存草稿' : '发送排队'}
-                className="self-end"
-              >
-                {isDraft ? <FileEdit className="h-4 w-4" /> : <Send className="h-4 w-4" />}
-              </Button>
-            </div>
-          </>
-        )}
+        <CommandInput
+          taskId={taskId}
+          initialProviderId={task.lastProviderId}
+          initialMode={(task.lastMode as 'execute' | 'plan') || 'execute'}
+          disabled={hasRunning}
+          onSent={fetchTask}
+        />
       </div>
     </div>
   );

@@ -18,39 +18,48 @@ function createServer(): McpServer {
   server.registerTool(
     'create_task',
     {
-      description: 'Create a new task under a project. Use this to split work into sub-tasks.',
+      description: 'Create a new task under a project with an isolated git worktree.',
       inputSchema: z.object({
         projectId: z.string().describe('The project ID to create the task under'),
-        description: z.string().describe('Description of the task to create'),
+        description: z.string().describe('Name/description of the task'),
+        branch: z.string().optional().describe('Git branch name (lowercase, digits, hyphens only). Auto-generated if omitted.'),
       }),
     },
-    async ({ projectId, description }) => {
+    async ({ projectId, description, branch: rawBranch }) => {
       try {
         const project = db.select().from(projects).where(eq(projects.id, projectId)).get();
         if (!project) {
-          return {
-            content: [{ type: 'text' as const, text: `Error: Project ${projectId} not found` }],
-            isError: true,
-          };
+          return { content: [{ type: 'text' as const, text: `Error: Project ${projectId} not found` }], isError: true };
         }
 
-        const taskId = uuid();
-        db.insert(tasks).values({
-          id: taskId,
-          projectId,
-          description,
-          status: 'pending',
-        }).run();
+        const { execFileSync } = await import('child_process');
+        const { join } = await import('path');
+        const { mkdirSync, existsSync } = await import('fs');
 
+        const taskId = uuid();
+        const branch = rawBranch?.trim() || `task-${taskId.split('-')[0]}`;
+        const BRANCH_REGEX = /^[a-z0-9-]+$/;
+
+        if (!BRANCH_REGEX.test(branch)) {
+          return { content: [{ type: 'text' as const, text: 'Error: branch name must match [a-z0-9-]+' }], isError: true };
+        }
+
+        const existing = execFileSync('git', ['-C', project.workDir, 'branch', '--list', branch], { encoding: 'utf-8' }).trim();
+        if (existing) {
+          return { content: [{ type: 'text' as const, text: `Error: branch "${branch}" already exists` }], isError: true };
+        }
+
+        const worktreesBase = join(project.workDir, '.worktrees');
+        if (!existsSync(worktreesBase)) mkdirSync(worktreesBase, { recursive: true });
+
+        const worktreeDir = join(worktreesBase, branch);
+        execFileSync('git', ['-C', project.workDir, 'worktree', 'add', worktreeDir, '-b', branch], { encoding: 'utf-8' });
+
+        db.insert(tasks).values({ id: taskId, projectId, description, branch, worktreeDir }).run();
         const task = db.select().from(tasks).where(eq(tasks.id, taskId)).get();
-        return {
-          content: [{ type: 'text' as const, text: JSON.stringify(task, null, 2) }],
-        };
+        return { content: [{ type: 'text' as const, text: JSON.stringify(task, null, 2) }] };
       } catch (err) {
-        return {
-          content: [{ type: 'text' as const, text: `Failed to create task: ${(err as Error).message}` }],
-          isError: true,
-        };
+        return { content: [{ type: 'text' as const, text: `Failed to create task: ${(err as Error).message}` }], isError: true };
       }
     }
   );

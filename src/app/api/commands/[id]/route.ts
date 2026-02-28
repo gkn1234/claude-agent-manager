@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { commands, tasks } from '@/lib/schema';
-import { eq, and, inArray, not, desc } from 'drizzle-orm';
+import { eq, and, inArray, desc } from 'drizzle-orm';
 
 const VALID_TRANSITIONS: Record<string, string[]> = {
   pending: ['queued'],
@@ -35,13 +35,12 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
     // Check if this command is the latest finished non-init command
     const terminalStatuses = ['completed', 'failed', 'aborted'];
-    if (command.status && terminalStatuses.includes(command.status) && command.mode !== 'init') {
+    if (command.status && terminalStatuses.includes(command.status)) {
       const latest = db.select({ id: commands.id })
         .from(commands)
         .where(and(
           eq(commands.taskId, command.taskId),
           inArray(commands.status, terminalStatuses),
-          not(eq(commands.mode, 'init')),
         ))
         .orderBy(desc(commands.createdAt))
         .limit(1)
@@ -52,7 +51,6 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
   return NextResponse.json({
     ...command,
-    taskStatus: task?.status ?? null,
     taskLastProviderId: task?.lastProviderId ?? null,
     taskLastMode: task?.lastMode ?? null,
     isLatestFinished,

@@ -2,16 +2,15 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { Textarea } from '@/components/ui/textarea';
-import { ArrowLeft, FileText, ChevronDown, ChevronRight, Send, Square } from 'lucide-react';
+import { ArrowLeft, FileText, ChevronDown, ChevronRight, Square } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
 import 'highlight.js/styles/github-dark.css';
+import { CommandInput } from '@/components/commands/command-input';
 
 interface CommandDetail {
   id: string;
@@ -28,16 +27,10 @@ interface CommandDetail {
   startedAt: string | null;
   finishedAt: string | null;
   createdAt: string;
-  taskStatus: string | null;
   taskLastProviderId: string | null;
   taskLastMode: string | null;
   isLatestFinished: boolean;
   hasRunning: boolean;
-}
-
-interface Provider {
-  id: string;
-  name: string;
 }
 
 const statusConfig: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
@@ -86,48 +79,20 @@ export default function CommandDetailPage() {
   const [showExecEnv, setShowExecEnv] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // Command input states
-  const [providers, setProviders] = useState<Provider[]>([]);
-  const [prompt, setPrompt] = useState('');
-  const [mode, setMode] = useState<'execute' | 'plan'>('execute');
-  const [providerId, setProviderId] = useState<string | null>(null);
-  const [sending, setSending] = useState(false);
-  const [prefsLoaded, setPrefsLoaded] = useState(false);
-
   const fetchCommand = useCallback(async () => {
     try {
       const res = await fetch(`/api/commands/${commandId}`);
-      if (res.ok) {
-        const data = await res.json();
-        setCommand(data);
-        if (!prefsLoaded && data.isLatestFinished) {
-          if (data.taskLastMode === 'plan' || data.taskLastMode === 'execute') setMode(data.taskLastMode);
-          if (data.taskLastProviderId) setProviderId(data.taskLastProviderId);
-          setPrefsLoaded(true);
-        }
-      }
+      if (res.ok) setCommand(await res.json());
     } finally {
       setLoading(false);
     }
-  }, [commandId, prefsLoaded]);
-
-  const fetchProviders = useCallback(async () => {
-    const res = await fetch('/api/providers');
-    if (res.ok) {
-      const data = await res.json();
-      setProviders(data);
-      if (!providerId && !prefsLoaded && data.length > 0) {
-        setProviderId(data[0].id);
-      }
-    }
-  }, [providerId, prefsLoaded]);
+  }, [commandId]);
 
   useEffect(() => {
     fetchCommand();
-    fetchProviders();
     const interval = setInterval(fetchCommand, 5000);
     return () => clearInterval(interval);
-  }, [fetchCommand, fetchProviders]);
+  }, [fetchCommand]);
 
   const loadLogs = async () => {
     const res = await fetch(`/api/commands/${commandId}/logs`);
@@ -136,46 +101,9 @@ export default function CommandDetailPage() {
     setShowLogs(true);
   };
 
-  const savePrefs = useCallback(async (newProviderId: string | null, newMode: string) => {
-    if (!command) return;
-    await fetch(`/api/tasks/${command.taskId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ lastProviderId: newProviderId, lastMode: newMode }),
-    });
-  }, [command]);
-
-  const handleModeChange = (newMode: 'execute' | 'plan') => {
-    setMode(newMode);
-    savePrefs(providerId, newMode);
-  };
-
-  const handleProviderChange = (newProviderId: string) => {
-    setProviderId(newProviderId);
-    savePrefs(newProviderId, mode);
-  };
-
   const canShowInput = command
     && command.isLatestFinished
-    && command.taskStatus === 'ready'
     && !command.hasRunning;
-
-  const handleSend = async () => {
-    if (!command || !prompt.trim() || !providerId || sending) return;
-    setSending(true);
-    try {
-      const res = await fetch(`/api/tasks/${command.taskId}/commands`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt, mode, providerId }),
-      });
-      if (res.ok) {
-        router.push(`/tasks/${command.taskId}`);
-      }
-    } finally {
-      setSending(false);
-    }
-  };
 
   const handleAbort = async () => {
     await fetch(`/api/commands/${commandId}`, {
@@ -202,8 +130,6 @@ export default function CommandDetailPage() {
           </Button>
           <Badge variant={config.variant}>{config.label}</Badge>
           {command.mode === 'plan' && <Badge variant="outline">Plan</Badge>}
-          {command.mode === 'init' && <Badge variant="outline">Init</Badge>}
-          {command.mode === 'research' && <Badge variant="outline">调研</Badge>}
           <div className="flex-1" />
           {(command.status === 'running' || command.status === 'queued') && (
             <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={handleAbort}>
@@ -321,55 +247,13 @@ export default function CommandDetailPage() {
       {canShowInput && (
         <div className="border-t px-4 py-3">
           <div className="max-w-2xl mx-auto">
-            {providers.length === 0 ? (
-              <p className="text-xs text-destructive">
-                尚未配置 Provider，请先前往<Link href="/settings" className="underline ml-0.5">系统设置</Link>添加
-              </p>
-            ) : (
-              <>
-                <div className="flex items-center gap-2 mb-2">
-                  <select
-                    value={providerId || ''}
-                    onChange={(e) => handleProviderChange(e.target.value)}
-                    className="h-7 rounded-md border bg-background px-2 text-xs cursor-pointer"
-                  >
-                    {providers.map((p) => (
-                      <option key={p.id} value={p.id}>{p.name}</option>
-                    ))}
-                  </select>
-                  <div className="flex-1" />
-                  <div className="flex items-center rounded-md border text-xs overflow-hidden">
-                    <button
-                      className={`px-3 py-1 transition-colors cursor-pointer ${mode === 'execute' ? 'bg-primary text-primary-foreground' : 'hover:bg-accent'}`}
-                      onClick={() => handleModeChange('execute')}
-                    >
-                      Exec
-                    </button>
-                    <button
-                      className={`px-3 py-1 transition-colors cursor-pointer ${mode === 'plan' ? 'bg-primary text-primary-foreground' : 'hover:bg-accent'}`}
-                      onClick={() => handleModeChange('plan')}
-                    >
-                      Plan
-                    </button>
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <Textarea
-                    placeholder="输入指令..."
-                    value={prompt}
-                    onChange={(e) => setPrompt(e.target.value)}
-                    rows={2}
-                    className="resize-none text-sm"
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleSend();
-                    }}
-                  />
-                  <Button size="sm" onClick={handleSend} disabled={!prompt.trim() || !providerId || sending} className="self-end">
-                    <Send className="h-4 w-4" />
-                  </Button>
-                </div>
-              </>
-            )}
+            <CommandInput
+              taskId={command.taskId}
+              initialProviderId={command.taskLastProviderId}
+              initialMode={(command.taskLastMode as 'execute' | 'plan') || 'execute'}
+              showDraftToggle={true}
+              onSent={() => router.push(`/tasks/${command.taskId}`)}
+            />
           </div>
         </div>
       )}

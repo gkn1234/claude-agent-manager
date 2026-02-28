@@ -9,11 +9,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const task = db.select().from(tasks).where(eq(tasks.id, taskId)).get();
   if (!task) return NextResponse.json({ error: 'Task not found' }, { status: 404 });
 
-  // Only allow creating commands when task is ready
-  if (task.status !== 'ready') {
-    return NextResponse.json({ error: '任务尚未就绪，请等待初始化和调研完成' }, { status: 403 });
-  }
-
   const { prompt, mode = 'execute', autoQueue = true, providerId = null } = await req.json();
   if (!prompt) return NextResponse.json({ error: 'prompt required' }, { status: 400 });
   if (!providerId) return NextResponse.json({ error: '请选择 Provider' }, { status: 400 });

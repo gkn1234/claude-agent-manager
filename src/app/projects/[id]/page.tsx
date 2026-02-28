@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { ArrowLeft, Trash2 } from 'lucide-react';
@@ -15,7 +14,6 @@ interface Task {
   description: string;
   branch: string | null;
   worktreeDir: string | null;
-  status: string;
   createdAt: string;
   updatedAt: string | null;
 }
@@ -27,13 +25,6 @@ interface Project {
   gitRemote: string | null;
   tasks: Task[];
 }
-
-const taskStatusConfig: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
-  initializing: { label: '初始化中', variant: 'secondary' },
-  researching: { label: '调研中', variant: 'secondary' },
-  ready: { label: '就绪', variant: 'default' },
-  archived: { label: '已归档', variant: 'outline' },
-};
 
 export default function ProjectDetailPage() {
   const params = useParams();
@@ -99,42 +90,31 @@ export default function ProjectDetailPage() {
         <p className="text-sm text-muted-foreground text-center py-8">暂无任务</p>
       ) : (
         <div className="space-y-2">
-          {project.tasks.map((task) => {
-            const config = taskStatusConfig[task.status] || taskStatusConfig.initializing;
-            return (
-              <Link key={task.id} href={`/tasks/${task.id}`}>
-                <Card className="hover:bg-accent/50 transition-colors">
-                  <CardHeader className="py-3 px-4">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-sm flex-1">{task.description.slice(0, 60)}</CardTitle>
-                      <div className="flex items-center gap-1">
-                        <Badge variant={config.variant}>{config.label}</Badge>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
-                          onClick={(e) => handleDeleteTask(task.id, e)}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                    </div>
-                    {task.branch && (
-                      <CardDescription className="text-xs">{task.branch}</CardDescription>
-                    )}
-                    {task.worktreeDir && (
-                      <CardDescription className="text-xs font-mono truncate">{task.worktreeDir}</CardDescription>
-                    )}
-                    {task.updatedAt && (
-                      <CardDescription className="text-xs">
-                        活跃：{new Date(task.updatedAt).toLocaleString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                      </CardDescription>
-                    )}
-                  </CardHeader>
-                </Card>
-              </Link>
-            );
-          })}
+          {project.tasks.map((task) => (
+            <Link key={task.id} href={`/tasks/${task.id}`}>
+              <Card className="hover:bg-accent/50 transition-colors">
+                <CardHeader className="py-3 px-4">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-sm flex-1">{task.description}</CardTitle>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+                      onClick={(e) => handleDeleteTask(task.id, e)}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                  <CardDescription className="text-xs font-mono">{task.branch}</CardDescription>
+                  {task.updatedAt && (
+                    <CardDescription className="text-xs">
+                      活跃：{new Date(task.updatedAt).toLocaleString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                    </CardDescription>
+                  )}
+                </CardHeader>
+              </Card>
+            </Link>
+          ))}
         </div>
       )}
     </div>
