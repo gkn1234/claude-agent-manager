@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowLeft, FileText, ChevronDown, ChevronRight, Send } from 'lucide-react';
+import { ArrowLeft, FileText, ChevronDown, ChevronRight, Send, Square } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
@@ -177,6 +177,15 @@ export default function CommandDetailPage() {
     }
   };
 
+  const handleAbort = async () => {
+    await fetch(`/api/commands/${commandId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'aborted' }),
+    });
+    fetchCommand();
+  };
+
   if (loading) return <div className="flex h-[50vh] items-center justify-center text-muted-foreground">加载中...</div>;
   if (!command) return <div className="flex h-[50vh] items-center justify-center text-muted-foreground">指令不存在</div>;
 
@@ -195,6 +204,13 @@ export default function CommandDetailPage() {
           {command.mode === 'plan' && <Badge variant="outline">Plan</Badge>}
           {command.mode === 'init' && <Badge variant="outline">Init</Badge>}
           {command.mode === 'research' && <Badge variant="outline">调研</Badge>}
+          <div className="flex-1" />
+          {(command.status === 'running' || command.status === 'queued') && (
+            <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={handleAbort}>
+              <Square className="h-3.5 w-3.5 mr-1" />
+              中止
+            </Button>
+          )}
         </div>
       </div>
 

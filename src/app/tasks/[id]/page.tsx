@@ -7,7 +7,9 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { ArrowLeft, Send, Loader2, Play, Trash2 } from 'lucide-react';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { ArrowLeft, Send, Loader2, Play, Trash2, Square, Undo2, FileEdit } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface Command {
   id: string;
@@ -15,6 +17,7 @@ interface Command {
   mode: string;
   status: string;
   result: string | null;
+  providerId: string | null;
   startedAt: string | null;
   finishedAt: string | null;
   createdAt: string;
@@ -66,6 +69,7 @@ export default function TaskPage() {
   const [mode, setMode] = useState<'execute' | 'plan'>('execute');
   const [providerId, setProviderId] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
+  const [isDraft, setIsDraft] = useState(false);
   const [initializing, setInitializing] = useState(false);
   const [prefsLoaded, setPrefsLoaded] = useState(false);
 
@@ -144,14 +148,20 @@ export default function TaskPage() {
   const inputDisabled = hasRunning || !isTaskReady || noProvider;
 
   const handleSend = async () => {
-    if (!prompt.trim() || inputDisabled || !providerId) return;
+    if (!prompt.trim() || !providerId) return;
+    if (!isDraft && inputDisabled) return;
     setSending(true);
     try {
-      await fetch(`/api/tasks/${taskId}/commands`, {
+      const res = await fetch(`/api/tasks/${taskId}/commands`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt, mode, providerId }),
+        body: JSON.stringify({ prompt, mode, providerId, autoQueue: !isDraft }),
       });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({ error: '请求失败' }));
+        toast.error(data.error || `请求失败 (${res.status})`);
+        return;
+      }
       setPrompt('');
       fetchTask();
     } finally {
@@ -165,6 +175,57 @@ export default function TaskPage() {
     if (res.ok && task) {
       router.push(`/projects/${task.projectId}`);
     }
+  };
+
+  const handleAbort = async (commandId: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    await fetch(`/api/commands/${commandId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'aborted' }),
+    });
+    fetchTask();
+  };
+
+  const handleCancelQueue = async (commandId: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    await fetch(`/api/commands/${commandId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'pending' }),
+    });
+    fetchTask();
+  };
+
+  const handleDeleteCommand = async (commandId: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    await fetch(`/api/commands/${commandId}`, { method: 'DELETE' });
+    fetchTask();
+  };
+
+  const handleQueueCommand = async (commandId: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    await fetch(`/api/commands/${commandId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'queued' }),
+    });
+    fetchTask();
+  };
+
+  const handleUpdatePendingCommand = async (commandId: string, updates: Record<string, unknown>, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    await fetch(`/api/commands/${commandId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates),
+    });
+    fetchTask();
   };
 
   if (loading) return <div className="flex h-[50vh] items-center justify-center text-muted-foreground">加载中...</div>;
@@ -208,18 +269,102 @@ export default function TaskPage() {
           <div className="space-y-3">
             {[...task.commands].reverse().map((cmd, i) => {
               const cfg = statusConfig[cmd.status] || statusConfig.pending;
+              if (cmd.status === 'pending') {
+                return (
+                  <div key={cmd.id} className="rounded-lg border border-dashed p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs text-muted-foreground">#{task.commands.length - i} · 草稿</span>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-5 px-1.5 text-xs"
+                          onClick={(e) => handleQueueCommand(cmd.id, e)}
+                        >
+                          <Play className="h-3 w-3 mr-0.5" />
+                          排队
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-5 w-5 p-0 text-destructive hover:text-destructive"
+                          onClick={(e) => handleDeleteCommand(cmd.id, e)}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+                    <Textarea
+                      defaultValue={cmd.prompt}
+                      rows={2}
+                      className="resize-none text-sm mb-2"
+                      onBlur={(e) => {
+                        if (e.target.value !== cmd.prompt) {
+                          handleUpdatePendingCommand(cmd.id, { prompt: e.target.value }, e as unknown as React.MouseEvent);
+                        }
+                      }}
+                    />
+                    <div className="flex items-center gap-2">
+                      <select
+                        defaultValue={cmd.mode}
+                        onChange={(e) => handleUpdatePendingCommand(cmd.id, { mode: e.target.value }, e as unknown as React.MouseEvent)}
+                        className="h-6 rounded-md border bg-background px-1.5 text-xs cursor-pointer"
+                      >
+                        <option value="execute">Exec</option>
+                        <option value="plan">Plan</option>
+                      </select>
+                      <select
+                        defaultValue={cmd.providerId || ''}
+                        onChange={(e) => handleUpdatePendingCommand(cmd.id, { providerId: e.target.value }, e as unknown as React.MouseEvent)}
+                        className="h-6 rounded-md border bg-background px-1.5 text-xs cursor-pointer"
+                      >
+                        {providers.map((p) => (
+                          <option key={p.id} value={p.id}>{p.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                );
+              }
               return (
                 <Link key={cmd.id} href={`/commands/${cmd.id}`}>
                   <div className="rounded-lg border p-3 hover:bg-accent/50 transition-colors">
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-xs text-muted-foreground">#{task.commands.length - i}</span>
-                      <Badge variant={cfg.variant} className="text-xs">{cfg.label}</Badge>
+                      <div className="flex items-center gap-1">
+                        {cmd.status === 'running' && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-5 w-5 p-0 text-destructive hover:text-destructive"
+                            onClick={(e) => handleAbort(cmd.id, e)}
+                          >
+                            <Square className="h-3 w-3" />
+                          </Button>
+                        )}
+                        {cmd.status === 'queued' && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-5 px-1.5 text-xs text-muted-foreground hover:text-foreground"
+                            onClick={(e) => handleCancelQueue(cmd.id, e)}
+                          >
+                            <Undo2 className="h-3 w-3 mr-0.5" />
+                            取消
+                          </Button>
+                        )}
+                        <Badge variant={cfg.variant} className="text-xs">{cfg.label}</Badge>
+                      </div>
                     </div>
                     <p className="text-sm line-clamp-2">{cmd.prompt.slice(0, 120)}</p>
                     <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
                       {cmd.mode === 'plan' && <Badge variant="outline" className="text-xs">Plan</Badge>}
                       {cmd.mode === 'init' && <Badge variant="outline" className="text-xs">Init</Badge>}
                       {cmd.mode === 'research' && <Badge variant="outline" className="text-xs">调研</Badge>}
+                      {cmd.providerId && (() => {
+                        const prov = providers.find(p => p.id === cmd.providerId);
+                        return prov ? <span>{prov.name}</span> : null;
+                      })()}
                       <span>{new Date(cmd.createdAt).toLocaleString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
                     </div>
                   </div>
@@ -287,38 +432,37 @@ export default function TaskPage() {
                 ))}
               </select>
               <div className="flex-1" />
-              <div className="flex items-center rounded-md border text-xs overflow-hidden">
-                <button
-                  className={`px-3 py-1 transition-colors cursor-pointer ${mode === 'execute' ? 'bg-primary text-primary-foreground' : 'hover:bg-accent'}`}
-                  onClick={() => handleModeChange('execute')}
-                  disabled={inputDisabled}
-                >
-                  Exec
-                </button>
-                <button
-                  className={`px-3 py-1 transition-colors cursor-pointer ${mode === 'plan' ? 'bg-primary text-primary-foreground' : 'hover:bg-accent'}`}
-                  onClick={() => handleModeChange('plan')}
-                  disabled={inputDisabled}
-                >
-                  Plan
-                </button>
-              </div>
+              <ToggleGroup type="single" variant="outline" size="sm" value={mode} onValueChange={(v) => v && handleModeChange(v as 'execute' | 'plan')}>
+                <ToggleGroupItem value="execute">Exec</ToggleGroupItem>
+                <ToggleGroupItem value="plan">Plan</ToggleGroupItem>
+              </ToggleGroup>
+              <ToggleGroup type="single" variant="outline" size="sm" value={isDraft ? 'draft' : 'queue'} onValueChange={(v) => v && setIsDraft(v === 'draft')}>
+                <ToggleGroupItem value="queue">排队</ToggleGroupItem>
+                <ToggleGroupItem value="draft">草稿</ToggleGroupItem>
+              </ToggleGroup>
             </div>
 
             <div className="flex gap-2">
               <Textarea
-                placeholder={inputDisabled ? (hasRunning ? '等待当前指令完成...' : '等待任务就绪...') : '输入指令...'}
+                placeholder={!isDraft && inputDisabled ? (hasRunning ? '等待当前指令完成...' : '等待任务就绪...') : '输入指令...'}
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
-                disabled={inputDisabled}
+                disabled={!isDraft && inputDisabled}
                 rows={2}
                 className="resize-none text-sm"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleSend();
                 }}
               />
-              <Button size="sm" onClick={handleSend} disabled={!prompt.trim() || inputDisabled || !providerId || sending} className="self-end">
-                <Send className="h-4 w-4" />
+              <Button
+                size="sm"
+                variant={isDraft ? 'outline' : 'default'}
+                onClick={handleSend}
+                disabled={!prompt.trim() || (!isDraft && inputDisabled) || !providerId || sending}
+                title={isDraft ? '保存草稿' : '发送排队'}
+                className="self-end"
+              >
+                {isDraft ? <FileEdit className="h-4 w-4" /> : <Send className="h-4 w-4" />}
               </Button>
             </div>
           </>

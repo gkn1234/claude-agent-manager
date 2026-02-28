@@ -4,8 +4,8 @@ import { commands, tasks } from '@/lib/schema';
 import { eq, and, inArray, not, desc } from 'drizzle-orm';
 
 const VALID_TRANSITIONS: Record<string, string[]> = {
-  pending: ['queued', 'aborted'],
-  queued: ['running', 'pending', 'aborted'],
+  pending: ['queued'],
+  queued: ['running', 'pending'],
   running: ['completed', 'failed', 'aborted'],
   // completed, failed, aborted are terminal states - no transitions allowed
 };
@@ -90,6 +90,14 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const allowedUpdates: Record<string, unknown> = {};
   if (updates.status) allowedUpdates.status = updates.status;
   if (updates.priority !== undefined) allowedUpdates.priority = updates.priority;
+
+  // Allow editing prompt, mode, providerId when command is pending
+  if (command.status === 'pending') {
+    if (updates.prompt !== undefined) allowedUpdates.prompt = updates.prompt;
+    if (updates.mode !== undefined) allowedUpdates.mode = updates.mode;
+    if (updates.providerId !== undefined) allowedUpdates.providerId = updates.providerId;
+  }
+
   if (updates.status === 'aborted' || updates.status === 'failed') {
     allowedUpdates.finishedAt = new Date().toISOString();
   }
@@ -97,4 +105,17 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   db.update(commands).set(allowedUpdates).where(eq(commands.id, id)).run();
   const updated = db.select().from(commands).where(eq(commands.id, id)).get();
   return NextResponse.json(updated);
+}
+
+export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const command = db.select().from(commands).where(eq(commands.id, id)).get();
+  if (!command) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+
+  if (command.status !== 'pending') {
+    return NextResponse.json({ error: '只能删除 pending 状态的命令' }, { status: 400 });
+  }
+
+  db.delete(commands).where(eq(commands.id, id)).run();
+  return NextResponse.json({ ok: true });
 }

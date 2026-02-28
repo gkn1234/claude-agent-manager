@@ -1,5 +1,5 @@
 import { spawn, ChildProcess, execFileSync } from 'child_process';
-import { createWriteStream, mkdirSync, existsSync, readdirSync, unlinkSync, statSync } from 'fs';
+import { createWriteStream, mkdirSync, existsSync, readdirSync, unlinkSync, statSync, rmSync } from 'fs';
 import { join } from 'path';
 import { db } from './db';
 import { commands, tasks, projects, providers } from './schema';
@@ -40,11 +40,49 @@ export function cleanupTask(taskId: string) {
     }
   }
 
-  // Remove git worktree
-  if (task.worktreeDir && existsSync(task.worktreeDir)) {
-    try {
-      execFileSync('git', ['worktree', 'remove', task.worktreeDir, '--force'], { encoding: 'utf-8' });
-    } catch {}
+  // Remove git worktree and its branch
+  if (task.worktreeDir) {
+    const project = db.select().from(projects).where(eq(projects.id, task.projectId)).get();
+
+    // 1. Get branch name before worktree removal (directory won't exist after)
+    let branchToDelete: string | null = null;
+    if (existsSync(task.worktreeDir)) {
+      try {
+        branchToDelete = execFileSync('git', ['-C', task.worktreeDir, 'rev-parse', '--abbrev-ref', 'HEAD'], { encoding: 'utf-8' }).trim();
+        if (['main', 'master', 'develop'].includes(branchToDelete)) {
+          branchToDelete = null;
+        }
+      } catch (e) {
+        console.warn(`[cleanupTask] Failed to get branch name for ${task.worktreeDir}:`, e);
+      }
+    }
+
+    // 2. Remove worktree — must run in main repo context
+    if (project && existsSync(task.worktreeDir)) {
+      try {
+        execFileSync('git', ['-C', project.workDir, 'worktree', 'remove', task.worktreeDir, '--force'], { encoding: 'utf-8' });
+      } catch (e) {
+        console.warn(`[cleanupTask] git worktree remove failed:`, e);
+        // Fallback: manually remove directory
+        try { rmSync(task.worktreeDir, { recursive: true, force: true }); } catch {}
+      }
+    }
+
+    // 3. Prune stale worktree metadata (ensures branch is no longer seen as checked out)
+    if (project) {
+      try {
+        execFileSync('git', ['-C', project.workDir, 'worktree', 'prune'], { encoding: 'utf-8' });
+      } catch {}
+
+      // 4. Delete the branch
+      if (branchToDelete) {
+        try {
+          execFileSync('git', ['-C', project.workDir, 'branch', '-D', branchToDelete], { encoding: 'utf-8' });
+        } catch (e) {
+          console.warn(`[cleanupTask] Failed to delete branch ${branchToDelete}:`, e);
+        }
+      }
+    }
   }
 
   // Delete DB records
@@ -80,7 +118,7 @@ export async function runCommand(commandId: string): Promise<void> {
   ];
 
   // Add plan mode flag if needed
-  if (command.mode === 'plan' || command.mode === 'research') {
+  if (command.mode === 'plan' || command.mode === 'research' || command.mode === 'init') {
     args.push('--permission-mode', 'plan');
   }
 
@@ -180,6 +218,7 @@ export async function runCommand(commandId: string): Promise<void> {
   let lastResult = '';
   let sessionId = '';
   let stderr = '';
+  let allAssistantText: string[] = [];
   let permissionDenials: Array<{ tool_name: string; tool_input: Record<string, unknown> }> = [];
 
   // Parse stream-json output line by line
@@ -197,6 +236,13 @@ export async function runCommand(commandId: string): Promise<void> {
         const event = JSON.parse(line);
         if (event.session_id && !sessionId) {
           sessionId = event.session_id;
+        }
+        // Accumulate all assistant text content blocks
+        if (event.type === 'assistant' && event.message?.content) {
+          const texts = (event.message.content as Array<{ type: string; text?: string }>)
+            .filter((b) => b.type === 'text' && b.text)
+            .map((b) => b.text as string);
+          allAssistantText.push(...texts);
         }
         if (event.type === 'result') {
           lastResult = event.result || '';
@@ -223,11 +269,11 @@ export async function runCommand(commandId: string): Promise<void> {
     logStream.end();
     runningProcesses.delete(commandId);
 
-    console.log(`[claude-runner] cmd=${commandId} process closed, code=${code}, lastResult_length=${lastResult.length}, permissionDenials_count=${permissionDenials.length}`);
+    console.log(`[claude-runner] cmd=${commandId} process closed, code=${code}, lastResult_length=${lastResult.length}, allAssistantText_count=${allAssistantText.length}, permissionDenials_count=${permissionDenials.length}`);
 
     const finalStatus = code === 0 ? 'completed' : 'failed';
     let result = code === 0
-      ? lastResult || 'Command completed'
+      ? (allAssistantText.length > 0 ? allAssistantText.join('\n\n') : lastResult || 'Command completed')
       : `Exit code: ${code}\n${stderr}`.trim();
 
     // Append AskUserQuestion permission denials as markdown

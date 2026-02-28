@@ -14,16 +14,19 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ error: '任务尚未就绪，请等待初始化和调研完成' }, { status: 403 });
   }
 
-  const running = db.select().from(commands)
-    .where(and(eq(commands.taskId, taskId), eq(commands.status, 'running')))
-    .get();
-  if (running) {
-    return NextResponse.json({ error: 'Task has a running command' }, { status: 409 });
-  }
-
   const { prompt, mode = 'execute', autoQueue = true, providerId = null } = await req.json();
   if (!prompt) return NextResponse.json({ error: 'prompt required' }, { status: 400 });
   if (!providerId) return NextResponse.json({ error: '请选择 Provider' }, { status: 400 });
+
+  // Only check running command when queuing directly; drafts (pending) are always allowed
+  if (autoQueue) {
+    const running = db.select().from(commands)
+      .where(and(eq(commands.taskId, taskId), eq(commands.status, 'running')))
+      .get();
+    if (running) {
+      return NextResponse.json({ error: '有正在执行的指令，请等待完成后再排队' }, { status: 409 });
+    }
+  }
 
   const id = uuid();
   db.insert(commands).values({
