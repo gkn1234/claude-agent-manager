@@ -16,7 +16,7 @@ Entry point for LLM agents navigating the Claude Dispatch documentation. Read do
 | [tasks-architecture](architecture/tasks-architecture.md) | How Tasks provide git worktree isolation and a manual-trigger init pipeline (pending -> init -> research -> ready). Covers status gating, provider requirement, cleanup logic, configurable prompts, task detail page (delete button, description truncate+dialog), and create-task dialog long content support. |
 | [commands-scheduler-architecture](architecture/commands-scheduler-architecture.md) | The command execution pipeline: priority-based scheduling, concurrency control, mode-based CLI flags (`--permission-mode plan`), provider env injection, execEnv audit, permission_denials extraction (AskUserQuestion -> markdown), runner post-processing, providerName in command list, three-section detail page layout with sticky input, and inline command input from the detail page. |
 | [providers-architecture](architecture/providers-architecture.md) | Provider profiles: named configurations with free-form env key-value pairs, CRUD API, drag-and-drop reordering, runtime env injection, and sensitive value masking. |
-| [mcp-feedback-loop](architecture/mcp-feedback-loop.md) | Bidirectional MCP bridge between Claude subprocesses and the app. Covers the 4 MCP tools (create_task, update_command, get_task_context, list_tasks) and how recursive task decomposition works. |
+| [mcp-feedback-loop](architecture/mcp-feedback-loop.md) | Bidirectional MCP bridge between Claude subprocesses and the app via Streamable HTTP (`/api/mcp`). Covers the 4 MCP tools (create_task, update_command, get_task_context, list_tasks) with direct DB access, stateless transport, and recursive task decomposition. |
 
 ## Guides
 

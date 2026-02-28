@@ -84,7 +84,7 @@ export async function runCommand(commandId: string): Promise<void> {
     args.push('--permission-mode', 'plan');
   }
 
-  // Inject MCP config if available
+  // Inject MCP config if available — HTTP mode, no path resolution needed
   const mcpConfigPath = join(process.cwd(), 'mcp-config.json');
   if (existsSync(mcpConfigPath)) {
     args.push('--mcp-config', mcpConfigPath);

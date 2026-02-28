@@ -17,7 +17,7 @@ Claude Dispatch is a task orchestration system built on a three-tier entity hier
 | UI | React 19, shadcn/ui (Radix UI), Tailwind CSS 4, Lucide icons |
 | Database | SQLite via better-sqlite3 + Drizzle ORM (WAL mode) |
 | AI Integration | Claude Code CLI (spawned as subprocess, NDJSON stream parsing) |
-| MCP | `@modelcontextprotocol/sdk` 1.27 - stdio transport MCP server |
+| MCP | `@modelcontextprotocol/sdk` 1.27 - Streamable HTTP transport, embedded as Next.js API route (`/api/mcp`) |
 | Drag & Drop | `@dnd-kit/core` + `@dnd-kit/sortable` (provider reordering) |
 | Validation | Zod 4 |
 | Package Manager | pnpm |
@@ -48,7 +48,7 @@ Providers (named API credential profiles, sorted by sortOrder)
 
 **SSE Real-Time Updates:** `src/app/api/events/route.ts` maintains SSE connections, polls active commands every 2s, pushes change notifications. Client-side `src/hooks/use-commands.ts` receives SSE events then re-fetches full command list (including `providerName`) via REST for consistency.
 
-**MCP Feedback Loop:** `src/mcp-server-stdio.ts` exposes 4 tools (`create_task`, `update_command`, `get_task_context`, `list_tasks`) to Claude subprocesses via stdio MCP. This enables Claude to self-decompose tasks, report progress, and query context.
+**MCP Feedback Loop:** `src/app/api/mcp/route.ts` exposes 4 tools (`create_task`, `update_command`, `get_task_context`, `list_tasks`) to Claude subprocesses via Streamable HTTP MCP (stateless mode). Tools operate directly on the SQLite database. This enables Claude to self-decompose tasks, report progress, and query context.
 
 **Session Continuity:** `src/lib/claude-runner.ts` (`runCommand`) automatically passes `--resume <sessionId>` from the previous command in the same task, enabling multi-turn conversation across commands.
 
