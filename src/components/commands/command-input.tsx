@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import { Send, FileEdit } from 'lucide-react';
+import { Send, FileEdit, Mic, MicOff } from 'lucide-react';
 import { toast } from 'sonner';
+import { useSpeechRecognition } from '@/hooks/use-speech-recognition';
 
 interface Provider {
   id: string;
@@ -42,6 +43,27 @@ export function CommandInput({
   const [sending, setSending] = useState(false);
   const [isDraft, setIsDraft] = useState(false);
   const [prefsInited, setPrefsInited] = useState(false);
+  // Ref to hold the committed prompt text (before interim overlay)
+  const committedPromptRef = useRef('');
+  const [interimText, setInterimText] = useState('');
+
+  const { isSupported: speechSupported, isListening, start: startListening, stop: stopListening } = useSpeechRecognition({
+    onResult: (transcript) => {
+      // Append final transcript to committed prompt
+      const separator = committedPromptRef.current && !committedPromptRef.current.endsWith('\n') ? ' ' : '';
+      const updated = committedPromptRef.current + separator + transcript;
+      committedPromptRef.current = updated;
+      setPrompt(updated);
+      setInterimText('');
+    },
+    onInterim: (transcript) => {
+      setInterimText(transcript);
+    },
+    onError: (error) => {
+      toast.error(error);
+      setInterimText('');
+    },
+  });
 
   const fetchProviders = useCallback(async () => {
     const res = await fetch('/api/providers');
@@ -103,11 +125,26 @@ export function CommandInput({
         return;
       }
       setPrompt('');
+      committedPromptRef.current = '';
+      setInterimText('');
       onSent?.();
     } finally {
       setSending(false);
     }
   };
+
+  const handleToggleListening = () => {
+    if (isListening) {
+      stopListening();
+      setInterimText('');
+    } else {
+      committedPromptRef.current = prompt;
+      startListening();
+    }
+  };
+
+  // Display text: committed prompt + interim overlay
+  const displayPrompt = interimText ? prompt + (prompt && !prompt.endsWith('\n') ? ' ' : '') + interimText : prompt;
 
   if (noProvider) {
     return (
@@ -146,15 +183,30 @@ export function CommandInput({
       <div className="flex gap-2">
         <Textarea
           placeholder={!isDraft && inputDisabled ? '等待当前指令完成...' : '输入指令...'}
-          value={prompt}
-          onChange={(e) => setPrompt(e.target.value)}
-          disabled={!isDraft && inputDisabled}
+          value={displayPrompt}
+          onChange={(e) => {
+            setPrompt(e.target.value);
+            committedPromptRef.current = e.target.value;
+          }}
+          disabled={(!isDraft && inputDisabled) || isListening}
           rows={2}
           className="resize-none text-sm"
           onKeyDown={(e) => {
             if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleSend();
           }}
         />
+        {speechSupported && (
+          <Button
+            size="sm"
+            variant={isListening ? 'destructive' : 'ghost'}
+            onClick={handleToggleListening}
+            disabled={!isDraft && inputDisabled}
+            title={isListening ? '停止语音输入' : '语音输入'}
+            className={`self-end ${isListening ? 'animate-pulse' : ''}`}
+          >
+            {isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+          </Button>
+        )}
         <Button
           size="sm"
           variant={isDraft ? 'outline' : 'default'}
