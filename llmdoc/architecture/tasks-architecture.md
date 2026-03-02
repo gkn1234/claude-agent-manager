@@ -16,7 +16,7 @@
 - `src/lib/scheduler.ts`（`tick`）：轮询排队命令。通过跳过已有运行中命令的任务来强制每任务串行执行。
 - `src/lib/claude-runner.ts`（`runCommand`、`cleanupTask`）：在任务的 `worktreeDir` 中生成注入了服务商环境变量的 `claude` CLI。`cleanupTask` 执行完整清理（终止进程、删除日志、移除工作树和分支、删除数据库记录），使用 `git -C <mainRepoDir>` 保证正确的仓库上下文。
 - `src/components/projects/create-task-dialog.tsx`（`CreateTaskDialog`）：创建任务对话框，包含任务名称（Input）和分支名（Input，选填，font-mono，带格式验证反馈）。
-- `src/components/commands/command-input.tsx`（`CommandInput`）：共享命令输入组件，被任务详情页和命令详情页共用。支持 provider 选择、Exec/Plan 模式切换、Draft/Queue 模式切换、偏好自动保存。
+- `src/components/commands/command-input.tsx`（`CommandInput`）：共享命令输入组件，被任务详情页和命令详情页共用。支持 provider 选择、Exec/Plan 模式切换、Draft/Queue 模式切换、语音输入（麦克风按钮，基于 Web Speech API，不支持时自动隐藏）、偏好自动保存。
 
 ## 3. 执行流程（LLM 检索图）
 
@@ -48,4 +48,4 @@
 - **移除 status 字段** 简化了数据模型，任务创建后即可接受命令，无需等待初始化流程。
 - **分支名自动生成** 降低了用户操作门槛，同时允许高级用户指定分支名。
 - **`cleanupTask()` 集中化** 确保任务 DELETE 和项目 DELETE（级联）共享一致的清理逻辑。
-- **`CommandInput` 共享组件** 统一了任务详情页和命令详情页的输入交互，减少代码重复。
+- **`CommandInput` 共享组件** 统一了任务详情页和命令详情页的输入交互，减少代码重复。集成语音输入能力（`src/hooks/use-speech-recognition.ts`），支持浏览器兼容性检测和优雅降级。

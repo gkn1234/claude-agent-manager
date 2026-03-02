@@ -18,7 +18,8 @@
 - `src/app/api/commands/route.ts`（`GET`）：列出命令，JOIN 任务+项目表，leftJoin 服务商表，返回 `providerName` 字段。支持按 status/project_id/task_id 过滤。
 - `src/app/api/commands/[id]/logs/route.ts`（`GET`）：从文件系统读取 NDJSON 日志文件。
 - `src/app/commands/[id]/page.tsx`（`CommandDetailPage`）：命令详情 UI，三段式弹性布局：吸顶 header、可滚动内容区、吸底输入区。当 `isLatestFinished && !hasRunning` 时，在底部渲染 `CommandInput` 共享组件。提交后跳转回任务页。
-- `src/components/commands/command-input.tsx`（`CommandInput`）：共享命令输入组件，支持 provider 选择、Exec/Plan ToggleGroup、Draft/Queue ToggleGroup、偏好自动保存到任务。被任务详情页和命令详情页共用。
+- `src/components/commands/command-input.tsx`（`CommandInput`）：共享命令输入组件，支持 provider 选择、Exec/Plan ToggleGroup、Draft/Queue ToggleGroup、语音输入（通过麦克风按钮）、偏好自动保存到任务。被任务详情页和命令详情页共用。
+- `src/hooks/use-speech-recognition.ts`（`useSpeechRecognition`）：封装浏览器 Web Speech API 的自定义 hook，提供 `isSupported`、`isListening`、`start`、`stop` 接口，支持 `onResult`/`onInterim`/`onError` 回调。默认语言 `zh-CN`。
 - `src/components/commands/command-card.tsx`（`CommandCard`、`CommandCardInner`）：在队列列表中渲染命令卡片。在状态/模式徽章旁以静默文本显示 `providerName`（来自 leftJoin）。
 
 ## 3. 执行流程（LLM 检索图）
@@ -62,9 +63,10 @@
 
 - **1.** `src/components/commands/command-input.tsx`（`CommandInput`）：独立组件，接收 `taskId`、`initialProviderId`、`initialMode`、`showDraftToggle`、`disabled`、`onSent` 等 Props。
 - **2.** 自动获取服务商列表，初始化偏好（provider/mode）从 Props 传入。
-- **3.** provider/mode 变更时通过 `PATCH /api/tasks/[taskId]` 保存偏好 -- `src/components/commands/command-input.tsx:69-75`。
-- **4.** 提交通过 `POST /api/tasks/[taskId]/commands` 创建命令 -- `src/components/commands/command-input.tsx:90-110`。
+- **3.** provider/mode 变更时通过 `PATCH /api/tasks/[taskId]` 保存偏好 -- `src/components/commands/command-input.tsx:91-97`。
+- **4.** 提交通过 `POST /api/tasks/[taskId]/commands` 创建命令 -- `src/components/commands/command-input.tsx:112-134`。
 - **5.** 任务详情页（`src/app/tasks/[id]/page.tsx:272-280`）和命令详情页（`src/app/commands/[id]/page.tsx:247-258`）均使用此组件。
+- **6.** 语音输入：集成 `src/hooks/use-speech-recognition.ts`（`useSpeechRecognition`）自定义 hook，封装浏览器原生 Web Speech API。点击麦克风按钮（Mic/MicOff 图标）切换录音状态 -- `src/components/commands/command-input.tsx:136-144`。实时显示 interim results（覆盖在已输入文本后），最终识别结果追加到 prompt。不支持 Speech API 的浏览器自动隐藏按钮（优雅降级）-- `src/components/commands/command-input.tsx:198-209`。录音中按钮显示红色（`variant='destructive'`）并带脉动动画（`animate-pulse`）。
 
 ### 3f. 内联命令输入条件（命令详情页）
 
@@ -93,5 +95,5 @@
 - **`--permission-mode plan`** 用于 plan 模式命令。
 - **服务商注入环境变量** 允许不同命令使用不同 API 凭证，而无需修改服务器自身的环境变量。
 - **`execEnv` 审计记录** 让用户可以通过命令详情页调试每条命令使用了哪个服务商/环境/参数。
-- **`CommandInput` 共享组件** 统一了任务详情页和命令详情页的输入交互，避免代码重复并保持行为一致。
+- **`CommandInput` 共享组件** 统一了任务详情页和命令详情页的输入交互，避免代码重复并保持行为一致。集成语音输入能力，通过 `useSpeechRecognition` hook 实现，不支持的浏览器优雅降级（隐藏按钮）。
 - **`cleanupTask()` 集中化** 处理完整清理（终止进程、日志、工作树、数据库），被任务删除和项目删除两处使用。

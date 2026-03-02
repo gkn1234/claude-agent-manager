@@ -54,7 +54,7 @@ Claude Dispatch 是一个基于三层实体层级构建的任务编排系统：*
 
 **执行环境审计（Execution Environment Audit）：** 每条命令记录经脱敏处理的 `execEnv` JSON 对象（服务商名称、工作目录、CLI 参数、已脱敏环境变量），用于调试。
 
-**共享命令输入组件：** `src/components/commands/command-input.tsx`（`CommandInput`）被任务详情页和命令详情页共用，提供服务商选择、Exec/Plan 模式切换、Draft/Queue 模式切换，以及偏好自动保存。
+**共享命令输入组件：** `src/components/commands/command-input.tsx`（`CommandInput`）被任务详情页和命令详情页共用，提供服务商选择、Exec/Plan 模式切换、Draft/Queue 模式切换、语音输入（通过 `src/hooks/use-speech-recognition.ts` 封装 Web Speech API，支持实时 interim 展示、最终结果追加、浏览器不支持时自动隐藏按钮），以及偏好自动保存。
 
 ## 6. 移动端优先响应式设计
 
