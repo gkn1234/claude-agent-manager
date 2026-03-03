@@ -52,6 +52,7 @@
 - **优先使用 shadcn 组件**，而非手写 HTML 元素。使用 `npx shadcn@latest add <component> --yes` 安装新组件。
 - **使用前先查阅文档：** 查阅 shadcn 文档确认正确的 props 和可用功能（如 sonner 的 `richColors`、ToggleGroup 的 `variant="outline"`），不要猜测 API 接口。
 - **分段切换：** 对于互斥选项（如 Exec/Plan、Draft/Queue），使用 `src/components/ui/toggle-group.tsx` 中的 `ToggleGroup` + `ToggleGroupItem`，禁止手写按钮组。
+- **折叠面板：** 对于可展开/折叠的内容区域，使用 `src/components/ui/collapsible.tsx` 中的 `Collapsible` + `CollapsibleTrigger` + `CollapsibleContent`（基于 Radix UI Collapsible 原语）。
 - **切换激活样式：** `src/components/ui/toggle.tsx` 使用 `data-[state=on]:bg-primary data-[state=on]:text-primary-foreground` 实现高对比度激活状态（而非默认的 `bg-accent`）。
 
 ## 6. 移动端优先交互

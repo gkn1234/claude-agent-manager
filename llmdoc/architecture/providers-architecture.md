@@ -12,6 +12,8 @@
 - `src/app/api/providers/[id]/route.ts`（`PATCH`、`DELETE`）：更新服务商名称/envJson；删除服务商。
 - `src/app/api/providers/reorder/route.ts`（`PATCH`）：批量更新所有服务商的 `sortOrder`，持久化拖放排序结果。
 - `src/lib/claude-runner.ts:107-131`（`runCommand`）：通过 `command.providerId` 加载服务商，清除冲突的环境变量，将服务商的 `envJson` 注入生成环境。
+- `src/app/(app)/settings/page.tsx`（`SettingsPage`、`SortableProviderCard`、`NewProviderCard`）：设置页面使用 Tabs 分为"Provider 配置"和"系统参数"两个 Tab。Provider 卡片使用 Collapsible 组件实现折叠/展开，默认折叠仅显示名称和拖拽手柄；新建 Provider 卡片默认展开。
+- `src/components/ui/collapsible.tsx`（`Collapsible`、`CollapsibleTrigger`、`CollapsibleContent`）：shadcn/ui Collapsible 组件，基于 Radix UI Collapsible 原语封装。
 - `src/app/tasks/[id]/page.tsx`：任务页面在 init 触发器和命令输入两处显示服务商 `<select>` 下拉框。选择结果持久化到 `task.lastProviderId`。
 - `src/app/commands/[id]/page.tsx`：命令详情页显示可折叠的 `execEnv` 区块，包含服务商名称、cwd、CLI 参数和脱敏环境变量。
 

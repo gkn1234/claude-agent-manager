@@ -62,4 +62,4 @@ Claude Dispatch 是一个基于三层实体层级构建的任务编排系统：*
 
 - `src/components/nav/app-shell.tsx`（`AppShell`）- 使用 `useIsMobile()`（768px 断点）在 `BottomTabs`（移动端）和 `Sidebar`（桌面端）之间切换。
 - 所有页面均为 `'use client'` 组件，界面语言为简体中文（zh-CN）。
-- 共 7 个路由：`/login`（登录页，无导航）、`/`（命令队列，含项目/任务筛选）、`/projects`、`/projects/[id]`、`/tasks/[id]`、`/commands/[id]`、`/settings`。认证后页面通过 `src/app/(app)/layout.tsx` 路由分组包裹 AppShell。
+- 共 7 个路由：`/login`（登录页，无导航）、`/`（命令队列，含项目/任务筛选）、`/projects`、`/projects/[id]`、`/tasks/[id]`、`/commands/[id]`、`/settings`（Tabs 分区：Provider 配置 + 系统参数，Provider 卡片支持 Collapsible 折叠/展开）。认证后页面通过 `src/app/(app)/layout.tsx` 路由分组包裹 AppShell。
