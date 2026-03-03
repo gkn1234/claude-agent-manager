@@ -14,7 +14,7 @@ set -euo pipefail
 # 定位到项目根目录（脚本在 deploy/ 子目录下）
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 APP_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-SERVICE_NAME="claude-dispatch"
+SERVICE_NAME="claude-agent-manager"
 
 echo "=== 部署 Claude Dispatch ==="
 echo "应用目录: $APP_DIR"
