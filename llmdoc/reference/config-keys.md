@@ -24,7 +24,20 @@
 
 注意：`init_prompt` 和 `research_prompt` 配置项已移除，不再存在于 `CONFIG_DEFAULTS` 中。
 
-## 4. API 验证规则
+## 4. 认证环境变量
+
+认证相关配置通过环境变量（非数据库配置表）管理，定义在 `src/lib/auth.ts`。
+
+| 变量名 | 必填 | 描述 |
+|--------|------|------|
+| `AUTH_PASSWORD` | 是 | 登录密码，用于单密码认证 |
+| `AUTH_SECRET` | 是 | HMAC-SHA256 签名密钥，用于 Cookie token 签名 |
+
+两个变量均未设置时，应用返回 503 拒绝所有请求（公共路径除外）。参考 `.env.example` 获取默认模板。
+
+- **相关架构：** `/llmdoc/architecture/auth-architecture.md` - 认证系统完整架构。
+
+## 5. API 验证规则
 
 `src/app/api/system/config/route.ts` 中的 PATCH 端点强制执行以下规则：
 

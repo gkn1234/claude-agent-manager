@@ -2,7 +2,7 @@
 
 ## 1. 系统定位
 
-- **是什么：** 一个 Next.js Web 应用，用于向运行在 ECS 服务器上的 Claude Code CLI 进程远程派发任务，具备实时监控和基于 MCP 的反馈循环。
+- **是什么：** 一个 Next.js Web 应用，用于向运行在 ECS 服务器上的 Claude Code CLI 进程远程派发任务，具备实时监控、基于 MCP 的反馈循环和单密码认证保护。
 - **用途：** 让用户通过移动端优先的 Web UI 管理 AI 驱动的编码任务，在隔离的 git 工作树（worktree）上编排 Claude Code 的执行，支持基于优先级的调度、并发执行控制和可配置的服务商配置文件。
 
 ## 2. 高层描述
@@ -50,6 +50,8 @@ Claude Dispatch 是一个基于三层实体层级构建的任务编排系统：*
 
 **MCP 反馈循环：** `src/app/api/mcp/route.ts` 通过 Streamable HTTP MCP（无状态模式）向 Claude 子进程暴露 4 个工具（`create_task`、`update_command`、`get_task_context`、`list_tasks`）。这些工具直接操作 SQLite 数据库，使 Claude 能够自我分解任务、汇报进度和查询上下文。
 
+**单密码认证：** `src/middleware.ts` 拦截所有请求，通过 `src/lib/auth.ts` 验证 HMAC-SHA256 签名的 Cookie。白名单路径（`/login`、`/api/auth/`、`/api/mcp`）免认证。环境变量 `AUTH_PASSWORD` 和 `AUTH_SECRET` 必须配置，否则返回 503。登录页（`/login`）独立于 `(app)` 路由分组，不显示导航。
+
 **会话连续性（Session Continuity）：** `src/lib/claude-runner.ts`（`runCommand`）自动传递同一任务中前一条命令的 `--resume <sessionId>`，实现跨命令的多轮对话。
 
 **执行环境审计（Execution Environment Audit）：** 每条命令记录经脱敏处理的 `execEnv` JSON 对象（服务商名称、工作目录、CLI 参数、已脱敏环境变量），用于调试。
@@ -60,4 +62,4 @@ Claude Dispatch 是一个基于三层实体层级构建的任务编排系统：*
 
 - `src/components/nav/app-shell.tsx`（`AppShell`）- 使用 `useIsMobile()`（768px 断点）在 `BottomTabs`（移动端）和 `Sidebar`（桌面端）之间切换。
 - 所有页面均为 `'use client'` 组件，界面语言为简体中文（zh-CN）。
-- 共 6 个路由：`/`（命令队列，含项目/任务筛选）、`/projects`、`/projects/[id]`、`/tasks/[id]`、`/commands/[id]`、`/settings`。
+- 共 7 个路由：`/login`（登录页，无导航）、`/`（命令队列，含项目/任务筛选）、`/projects`、`/projects/[id]`、`/tasks/[id]`、`/commands/[id]`、`/settings`。认证后页面通过 `src/app/(app)/layout.tsx` 路由分组包裹 AppShell。
