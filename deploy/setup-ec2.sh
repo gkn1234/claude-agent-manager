@@ -112,6 +112,7 @@ Environment=PORT=3000
 Environment=DB_PATH=${APP_DIR}/data/dispatch.db
 Environment=LOG_DIR=${APP_DIR}/logs
 Environment=HOSTNAME=0.0.0.0
+EnvironmentFile=-${APP_DIR}/.env
 
 # 资源限制
 LimitNOFILE=65536

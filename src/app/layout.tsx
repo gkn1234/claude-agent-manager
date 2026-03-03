@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { AppShell } from "@/components/nav/app-shell";
 import { Toaster } from "@/components/ui/sonner";
 
 const geistSans = Geist({
@@ -36,7 +35,7 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <AppShell>{children}</AppShell>
+        {children}
         <Toaster position="top-center" richColors />
       </body>
     </html>
