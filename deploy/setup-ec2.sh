@@ -1,7 +1,7 @@
 #!/bin/bash
 # =============================================================================
 # Claude Dispatch - EC2 环境初始化脚本
-# 适用系统: Amazon Linux 2023 / Ubuntu 22.04+
+# 适用系统: Amazon Linux 2023 / Ubuntu 22.04+ / OpenCloudOS / CentOS / RHEL
 # 用法: sudo bash setup-ec2.sh
 #
 # 执行完成后，按提示运行 deploy.sh 完成应用部署
@@ -25,14 +25,15 @@ fi
 echo "检测到系统: $OS"
 
 echo "=== [2/7] 安装系统依赖 ==="
-if [ "$OS" = "amzn" ]; then
+if [ "$OS" = "amzn" ] || [ "$OS" = "opencloudos" ] || [ "$OS" = "centos" ] || [ "$OS" = "rhel" ] || [ "$OS" = "fedora" ] || [ "$OS" = "tencentos" ]; then
   dnf update -y
-  dnf install -y git curl gcc g++ make python3
+  dnf install -y git curl gcc gcc-c++ make python3
 elif [ "$OS" = "ubuntu" ] || [ "$OS" = "debian" ]; then
   apt-get update
   apt-get install -y git curl build-essential python3
 else
   echo "不支持的操作系统: $OS"
+  echo "如果你的系统使用 dnf，请手动运行: dnf install -y git curl gcc gcc-c++ make python3"
   exit 1
 fi
 
