@@ -4,6 +4,7 @@ import { join } from 'path';
 import { db } from './db';
 import { commands, tasks, projects, providers } from './schema';
 import { eq } from 'drizzle-orm';
+import { getConfig } from '@/lib/config';
 
 const LOG_DIR = process.env.LOG_DIR || './logs';
 
@@ -316,7 +317,7 @@ export async function runCommand(commandId: string): Promise<void> {
   });
 
   // Timeout handler
-  const timeout = parseInt(process.env.COMMAND_TIMEOUT || '1800') * 1000;
+  const timeout = parseInt(getConfig('command_timeout', '1800')) * 1000;
   let killTimer: ReturnType<typeof setTimeout> | null = null;
   const timer = setTimeout(() => {
     if (runningProcesses.has(commandId)) {

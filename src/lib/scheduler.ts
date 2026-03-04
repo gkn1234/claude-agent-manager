@@ -4,17 +4,17 @@ import { eq, and, asc, desc } from 'drizzle-orm';
 import { runCommand, runningProcesses } from './claude-runner';
 import { getConfig } from '@/lib/config';
 
-const POLL_INTERVAL = parseInt(process.env.POLL_INTERVAL || '5') * 1000;
-
 let schedulerTimer: ReturnType<typeof setInterval> | null = null;
+let currentPollInterval = 0;
 
 export function startScheduler() {
   if (schedulerTimer) return;
 
   recoverOrphanedCommands();
 
-  schedulerTimer = setInterval(tick, POLL_INTERVAL);
-  console.log(`[Scheduler] Started, poll_interval=${POLL_INTERVAL}ms`);
+  currentPollInterval = parseInt(getConfig('poll_interval', '5')) * 1000;
+  schedulerTimer = setInterval(tick, currentPollInterval);
+  console.log(`[Scheduler] Started, poll_interval=${currentPollInterval}ms`);
 
   tick();
 }
@@ -27,6 +27,15 @@ export function stopScheduler() {
 }
 
 function tick() {
+  // Detect poll_interval changes at runtime
+  const newPollInterval = parseInt(getConfig('poll_interval', '5')) * 1000;
+  if (newPollInterval !== currentPollInterval && schedulerTimer) {
+    clearInterval(schedulerTimer);
+    currentPollInterval = newPollInterval;
+    schedulerTimer = setInterval(tick, currentPollInterval);
+    console.log(`[Scheduler] poll_interval changed to ${currentPollInterval}ms`);
+  }
+
   const maxConcurrent = parseInt(getConfig('max_concurrent', '2'));
   const runningCount = runningProcesses.size;
   if (runningCount >= maxConcurrent) return;
