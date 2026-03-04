@@ -6,6 +6,7 @@ import { commands, tasks, projects, providers } from './schema';
 import { eq } from 'drizzle-orm';
 import { getConfig } from '@/lib/config';
 import { buildMcpUrl } from './mcp-tools';
+import { checkAndRecoverAutonomousTask } from './safety-net';
 
 const LOG_DIR = process.env.LOG_DIR || './logs';
 
@@ -329,6 +330,15 @@ export async function runCommand(commandId: string): Promise<void> {
       if (currentTask && currentTask.managerSessionId !== sessionId) {
         db.update(tasks).set({ managerSessionId: sessionId }).where(eq(tasks.id, command.taskId)).run();
       }
+    }
+
+    // Safety net: delayed check for autonomous task stall
+    const finishedTask = db.select().from(tasks).where(eq(tasks.id, command.taskId)).get();
+    if (finishedTask?.mode === 'autonomous') {
+      const delay = parseInt(getConfig('safety_net_delay_ms', '3000'));
+      setTimeout(() => {
+        checkAndRecoverAutonomousTask(db, command.taskId, commandId);
+      }, delay);
     }
 
   });
