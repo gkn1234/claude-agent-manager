@@ -61,7 +61,13 @@
 - Toast 通知使用 `position="top-center"`，避免在移动端遮挡底部输入区域。
 - 按钮、切换和控件必须在手机屏幕上可以舒适点按。
 
-## 7. 数据库 Schema 变更规范
+## 8. API 与 MCP 同步原则
+
+- **管理 API 变动时必须审视 MCP 是否需要同步。** REST API（`src/app/api/`）和 MCP 工具（`src/app/api/mcp/route.ts`）共享同一数据模型，任何涉及实体创建、更新、删除的 API 变更，都必须检查对应的 MCP 工具是否需要同步更新参数、验证逻辑或行为。
+- **共享业务逻辑必须抽取到 `src/lib/` 下的共享函数。** REST API 和 MCP 工具作为薄层调用方，仅负责参数解析和响应格式转换。已有先例：`src/lib/tasks.ts`（`createTask`）。
+- **新增 MCP 工具参数时，须同步更新 inputSchema 的 `describe()` 描述。** 因为 MCP 工具的 description 和参数描述直接影响 Claude 子进程对工具的理解和调用质量。
+
+## 9. 数据库 Schema 变更规范
 
 - **Schema 定义：** `src/lib/schema.ts` 是唯一权威来源。所有表结构、DEFAULT 表达式、列定义均以此文件为准。
 - **同步命令：** 修改 `schema.ts` 后，必须立即执行 `pnpm db:push`（即 `drizzle-kit push --force`）同步本地数据库。
