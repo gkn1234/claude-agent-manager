@@ -67,7 +67,13 @@
 - **共享业务逻辑必须抽取到 `src/lib/` 下的共享函数。** REST API 和 MCP 工具作为薄层调用方，仅负责参数解析和响应格式转换。已有先例：`src/lib/tasks.ts`（`createTask`）。
 - **新增 MCP 工具参数时，须同步更新 inputSchema 的 `describe()` 描述。** 因为 MCP 工具的 description 和参数描述直接影响 Claude 子进程对工具的理解和调用质量。
 
-## 9. 数据库 Schema 变更规范
+## 9. 子进程执行规范
+
+- **涉及网络 I/O 的 git 操作（clone、fetch、pull、push）必须使用异步调用（`promisify(execFile)` 或 `spawn`）+ 超时保护。** 网络延迟不可控，同步调用会阻塞整个 Node.js 事件循环，导致服务器无响应。失败时需清理残留文件（如部分 clone 的目录）。已有先例：`src/lib/utils/git.ts`（`gitClone`，120s 超时）。
+- **纯本地 git 操作（branch、worktree、init、rev-parse）可以使用 `execFileSync`。** 这些操作在毫秒级完成，同步调用不会造成问题，强行异步化反而增加不必要的复杂度。
+- **所有 `execFileSync` / `execFile` 必须使用 `execFileSync('git', [...args])` 形式，禁止使用 `exec` 拼接字符串。** 防止命令注入。
+
+## 10. 数据库 Schema 变更规范
 
 - **Schema 定义：** `src/lib/schema.ts` 是唯一权威来源。所有表结构、DEFAULT 表达式、列定义均以此文件为准。
 - **同步命令：** 修改 `schema.ts` 后，必须立即执行 `pnpm db:push`（即 `drizzle-kit push --force`）同步本地数据库。
