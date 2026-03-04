@@ -16,6 +16,8 @@ interface Command {
   status: string;
   result: string | null;
   providerId: string | null;
+  role: string;
+  managerSummary: string | null;
   startedAt: string | null;
   finishedAt: string | null;
   createdAt: string;
@@ -29,6 +31,11 @@ interface Task {
   worktreeDir: string | null;
   lastProviderId: string | null;
   lastMode: string | null;
+  mode: string;
+  goal: string | null;
+  managerProviderId: string | null;
+  workerProviderId: string | null;
+  autonomousRound: number;
   commands: Command[];
 }
 
@@ -154,6 +161,21 @@ export default function TaskPage() {
           </Button>
         </div>
         <p className="text-xs text-muted-foreground font-mono ml-8">{task.branch}</p>
+        {task.mode === 'autonomous' && (
+          <div className="flex items-center gap-2 ml-8 mt-1">
+            <Badge variant="default" className="text-xs bg-purple-600 hover:bg-purple-600">
+              自主模式
+            </Badge>
+            <span className="text-xs text-muted-foreground">
+              轮次 {task.autonomousRound}
+            </span>
+            {task.goal && (
+              <span className="text-xs text-muted-foreground truncate max-w-[200px]" title={task.goal}>
+                {task.goal.slice(0, 50)}{task.goal.length > 50 ? '...' : ''}
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Command Timeline */}
