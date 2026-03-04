@@ -51,3 +51,41 @@ export function executeCreateCommand(db: any, params: CreateCommandParams): Crea
   const command = db.select().from(commands).where(eq(commands.id, commandId)).get()!;
   return { ok: true, command };
 }
+
+interface CompleteTaskParams {
+  taskId: string;
+  summary: string;
+}
+
+type TaskResult = { ok: true } | { ok: false; error: string };
+
+export function executeCompleteTask(db: any, params: CompleteTaskParams): TaskResult {
+  const { taskId, summary } = params;
+
+  const task = db.select().from(tasks).where(eq(tasks.id, taskId)).get();
+  if (!task) {
+    return { ok: false, error: `Task ${taskId} not found` };
+  }
+
+  const updatedGoal = `${task.goal || ''}\n\n---\n完成摘要: ${summary}`.trim();
+  db.update(tasks).set({ mode: 'manual', goal: updatedGoal }).where(eq(tasks.id, taskId)).run();
+  return { ok: true };
+}
+
+interface PauseTaskParams {
+  taskId: string;
+  reason: string;
+}
+
+export function executePauseTask(db: any, params: PauseTaskParams): TaskResult {
+  const { taskId, reason } = params;
+
+  const task = db.select().from(tasks).where(eq(tasks.id, taskId)).get();
+  if (!task) {
+    return { ok: false, error: `Task ${taskId} not found` };
+  }
+
+  const updatedGoal = `${task.goal || ''}\n\n---\n暂停原因: ${reason}`.trim();
+  db.update(tasks).set({ mode: 'manual', goal: updatedGoal }).where(eq(tasks.id, taskId)).run();
+  return { ok: true };
+}
