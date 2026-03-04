@@ -7,7 +7,8 @@
 
 ## 2. 核心组件
 
-- `src/app/api/mcp/route.ts`（`createServer`、`POST`、`GET`、`DELETE`）：嵌入 Next.js 应用中的 Streamable HTTP MCP 端点。暴露 4 个直接通过 Drizzle ORM 操作 SQLite 数据库的工具（无自身 HTTP 调用）。在无状态模式下使用 `WebStandardStreamableHTTPServerTransport`（`sessionIdGenerator: undefined`）。
+- `src/app/api/mcp/route.ts`（`createServer`、`POST`、`GET`、`DELETE`）：嵌入 Next.js 应用中的 Streamable HTTP MCP 端点。暴露 4 个工具：`create_task` 调用共享函数 `createTask()`（`src/lib/tasks.ts`），其余 3 个工具直接通过 Drizzle ORM 操作 SQLite 数据库。在无状态模式下使用 `WebStandardStreamableHTTPServerTransport`（`sessionIdGenerator: undefined`）。
+- `src/lib/tasks.ts`（`createTask`）：任务创建共享函数，被 MCP `create_task` 工具和 REST API 共同调用。详见 `/llmdoc/architecture/tasks-architecture.md`。
 - `mcp-config.json`：由 Claude CLI 读取的 MCP 客户端配置。将 `dispatch` 服务器定义为指向 `http://localhost:3000/api/mcp` 的 `type: "http"` 类型。
 - `src/lib/claude-runner.ts`（`runCommand`）：生成 Claude CLI 子进程，并在项目根目录存在 `mcp-config.json` 时有条件地注入 `--mcp-config` 标志，直接传递绝对路径（不生成临时文件）。
 - `src/lib/scheduler.ts`（`tick`、`startScheduler`）：轮询调度器，获取 `queued` 状态的命令并调用 `runCommand`，启动循环。
@@ -26,7 +27,7 @@
 
 | 工具 | 数据库操作 | 用途 |
 |------|-------------|---------|
-| `create_task` | `db.insert(tasks)` | 创建子任务用于分解 |
+| `create_task` | 调用 `createTask()` 共享函数（`src/lib/tasks.ts`） | 创建子任务用于分解 |
 | `update_command` | `db.update(commands)` | 汇报状态/结果 |
 | `get_task_context` | `db.select(tasks, commands)` | 读取任务和命令历史 |
 | `list_tasks` | `db.select(tasks)` | 列出同级任务以获取上下文 |
