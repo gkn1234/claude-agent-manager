@@ -52,7 +52,14 @@ export async function POST(req: Request) {
         );
       }
     } else {
-      await gitClone(gitUrl, finalDir);
+      try {
+        await gitClone(gitUrl, finalDir);
+      } catch (e) {
+        const stderr = (e as { stderr?: string }).stderr || '';
+        const message = stderr.split('\n').find(l => l.startsWith('fatal:'))
+          || (e as Error).message;
+        return NextResponse.json({ error: `git clone 失败: ${message}` }, { status: 500 });
+      }
     }
   } else if (mode === 'new') {
     finalDir = resolveProjectDir(name, workDir);
