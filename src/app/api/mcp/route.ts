@@ -23,9 +23,10 @@ function createServer(): McpServer {
         projectId: z.string().describe('The project ID to create the task under'),
         description: z.string().describe('Name/description of the task'),
         branch: z.string().optional().describe('Git branch name (lowercase, digits, hyphens only). Auto-generated if omitted.'),
+        baseBranch: z.string().optional().describe('Base branch to create from (start-point). Defaults to "main" if omitted.'),
       }),
     },
-    async ({ projectId, description, branch: rawBranch }) => {
+    async ({ projectId, description, branch: rawBranch, baseBranch: rawBaseBranch }) => {
       try {
         const project = db.select().from(projects).where(eq(projects.id, projectId)).get();
         if (!project) {
@@ -38,6 +39,7 @@ function createServer(): McpServer {
 
         const taskId = uuid();
         const branch = rawBranch?.trim() || `task-${taskId.split('-')[0]}`;
+        const baseBranch = rawBaseBranch?.trim() || 'main';
         const BRANCH_REGEX = /^[a-z0-9-]+$/;
 
         if (!BRANCH_REGEX.test(branch)) {
@@ -49,11 +51,16 @@ function createServer(): McpServer {
           return { content: [{ type: 'text' as const, text: `Error: branch "${branch}" already exists` }], isError: true };
         }
 
+        const baseExists = execFileSync('git', ['-C', project.workDir, 'branch', '--list', baseBranch], { encoding: 'utf-8' }).trim();
+        if (!baseExists) {
+          return { content: [{ type: 'text' as const, text: `Error: base branch "${baseBranch}" does not exist` }], isError: true };
+        }
+
         const worktreesBase = join(project.workDir, '.worktrees');
         if (!existsSync(worktreesBase)) mkdirSync(worktreesBase, { recursive: true });
 
         const worktreeDir = join(worktreesBase, branch);
-        execFileSync('git', ['-C', project.workDir, 'worktree', 'add', worktreeDir, '-b', branch], { encoding: 'utf-8' });
+        execFileSync('git', ['-C', project.workDir, 'worktree', 'add', worktreeDir, '-b', branch, baseBranch], { encoding: 'utf-8' });
 
         db.insert(tasks).values({ id: taskId, projectId, description, branch, worktreeDir }).run();
         const task = db.select().from(tasks).where(eq(tasks.id, taskId)).get();
