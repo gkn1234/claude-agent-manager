@@ -13,8 +13,7 @@
 - `src/app/api/auth/logout/route.ts`（`POST`）：清除认证 Cookie（maxAge=0）。
 - `src/app/login/page.tsx`（`LoginPage`, `LoginForm`）：登录页面，单密码输入框，shadcn/ui Card 组件。
 - `src/app/(app)/layout.tsx`（`AppLayout`）：路由分组布局，包裹 AppShell，仅认证后页面显示导航。
-- `src/components/nav/sidebar.tsx`（`handleLogout`）：桌面端退出登录按钮。
-- `src/components/nav/bottom-tabs.tsx`：移动端退出 tab。
+- `src/app/(app)/settings/page.tsx`：设置页面底部包含退出登录按钮（调用 `POST /api/auth/logout` 后跳转 `/login`）。
 
 ## 3. 执行流（LLM 检索路径）
 
