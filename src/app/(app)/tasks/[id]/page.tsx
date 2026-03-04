@@ -303,11 +303,26 @@ export default function TaskPage() {
                   </div>
                 );
               }
+              const isManager = cmd.role === 'manager';
               return (
                 <Link key={cmd.id} href={`/commands/${cmd.id}`}>
-                  <div className="rounded-lg border p-3 hover:bg-accent/50 transition-colors">
+                  <div className={`rounded-lg border p-3 transition-colors ${
+                    isManager
+                      ? 'border-purple-300 bg-purple-50/50 hover:bg-purple-100/50 dark:border-purple-800 dark:bg-purple-950/30 dark:hover:bg-purple-950/50'
+                      : 'hover:bg-accent/50'
+                  }`}>
                     <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs text-muted-foreground">#{task.commands.length - i}</span>
+                      <div className="flex items-center gap-1.5">
+                        {isManager && <Brain className="h-3 w-3 text-purple-600 dark:text-purple-400" />}
+                        <span className="text-xs text-muted-foreground">
+                          #{task.commands.length - i}
+                        </span>
+                        {isManager && (
+                          <Badge variant="outline" className="text-xs border-purple-300 text-purple-600 dark:border-purple-700 dark:text-purple-400">
+                            Manager
+                          </Badge>
+                        )}
+                      </div>
                       <div className="flex items-center gap-1">
                         {cmd.status === 'running' && (
                           <Button
