@@ -52,7 +52,7 @@ export async function POST(req: Request) {
         );
       }
     } else {
-      gitClone(gitUrl, finalDir);
+      await gitClone(gitUrl, finalDir);
     }
   } else if (mode === 'new') {
     finalDir = resolveProjectDir(name, workDir);

@@ -1,6 +1,11 @@
-import { execFileSync } from 'child_process';
-import { existsSync, readFileSync, appendFileSync } from 'fs';
+import { execFileSync, execFile as execFileCb } from 'child_process';
+import { existsSync, readFileSync, appendFileSync, rmSync } from 'fs';
 import { join } from 'path';
+import { promisify } from 'util';
+
+const execFileAsync = promisify(execFileCb);
+
+const CLONE_TIMEOUT_MS = 120_000; // 120 seconds
 
 export function isGitRepo(dir: string): boolean {
   return existsSync(join(dir, '.git'));
@@ -14,8 +19,23 @@ export function getGitRemote(dir: string): string | null {
   }
 }
 
-export function gitClone(url: string, targetDir: string): void {
-  execFileSync('git', ['clone', url, targetDir], { encoding: 'utf-8' });
+export async function gitClone(url: string, targetDir: string): Promise<void> {
+  try {
+    await execFileAsync('git', ['clone', url, targetDir], {
+      encoding: 'utf-8',
+      timeout: CLONE_TIMEOUT_MS,
+    });
+  } catch (e) {
+    // Clean up partially-cloned directory
+    if (existsSync(targetDir)) {
+      rmSync(targetDir, { recursive: true, force: true });
+    }
+    const err = e as Error & { killed?: boolean };
+    if (err.killed) {
+      throw new Error(`git clone 超时（${CLONE_TIMEOUT_MS / 1000}s），已清理残留目录`);
+    }
+    throw e;
+  }
 }
 
 export function gitInit(dir: string): void {
