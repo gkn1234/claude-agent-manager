@@ -8,7 +8,7 @@
 ## 2. Core Components
 
 - `deploy/setup-ec2.sh` (`APP_DIR`, `SERVICE_NAME`, `RUN_USER`): 环境初始化脚本。检测 OS（Amazon Linux/Ubuntu/OpenCloudOS/CentOS）、安装 Node.js 24 + pnpm + Claude Code CLI、clone 仓库、写入 systemd unit 文件并 enable 服务。
-- `deploy/deploy.sh` (`APP_DIR`, `SERVICE_NAME`): 部署/更新脚本。6 步流程：git pull -> pnpm install -> pnpm build -> 复制静态资源到 standalone -> 创建数据目录 -> systemctl restart。
+- `deploy/deploy.sh` (`APP_DIR`, `SERVICE_NAME`): 部署/更新脚本。7 步流程：git pull -> pnpm install -> pnpm build -> 复制静态资源到 standalone -> 创建数据目录 -> 数据库迁移 -> systemctl restart。
 - `deploy/update-claude-code.sh`: Claude Code CLI 热更新脚本。npm update 全局包，无需重启服务。
 - `.env` (`AUTH_PASSWORD`, `AUTH_SECRET`): 应用环境变量文件，通过 systemd EnvironmentFile 指令注入到服务进程。
 - `/etc/systemd/system/claude-agent-manager.service`: systemd unit 文件，由 setup-ec2.sh 自动生成。
@@ -31,7 +31,8 @@
 - **3. 构建:** `deploy/deploy.sh:30` `pnpm build`（生成 `.next/standalone/`）。
 - **4. 复制静态资源:** `deploy/deploy.sh:33-34` 将 `.next/static` 复制到 `.next/standalone/.next/static`，将 `public` 复制到 `.next/standalone/public`。Next.js standalone 模式不自动包含静态资源，这是官方文档明确要求的必要步骤。
 - **5. 数据目录:** `deploy/deploy.sh:37` 确保 `data/` 和 `logs/` 目录存在。
-- **6. 重启验证:** `deploy/deploy.sh:40-53` `systemctl restart` 后 3 秒检查服务状态。
+- **6. 数据库迁移:** `deploy/deploy.sh:40` 执行 `pnpm db:migrate`（即 `drizzle-kit migrate`），应用数据库 schema 变更。
+- **7. 重启验证:** `deploy/deploy.sh:43-56` `systemctl restart` 后 3 秒检查服务状态。
 
 ### systemd 服务运行时
 
