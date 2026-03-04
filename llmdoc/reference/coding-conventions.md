@@ -60,3 +60,13 @@
 - 所有交互元素必须具备最小 44x44 的触摸目标。使用 shadcn 组件的 `size="sm"` 作为最小值，禁止使用极小尺寸如 `text-[10px]`。
 - Toast 通知使用 `position="top-center"`，避免在移动端遮挡底部输入区域。
 - 按钮、切换和控件必须在手机屏幕上可以舒适点按。
+
+## 7. 数据库 Schema 变更规范
+
+- **Schema 定义：** `src/lib/schema.ts` 是唯一权威来源。所有表结构、DEFAULT 表达式、列定义均以此文件为准。
+- **同步命令：** 修改 `schema.ts` 后，必须立即执行 `pnpm db:push`（即 `drizzle-kit push --force`）同步本地数据库。
+- **部署同步：** `deploy.sh` 第 6 步自动执行 `pnpm db:push`，确保生产环境数据库与 schema 一致。
+- **SQLite 限制：** SQLite 不支持 `ALTER COLUMN`，修改列的 DEFAULT 表达式会导致 drizzle-kit 重建整张表（创建临时表 -> 迁移数据 -> 删除旧表 -> 重命名）。
+- **危险组合：** 在同一次变更中同时修改 DEFAULT 表达式和新增列，drizzle-kit push 会触发 bug：重建表时 `INSERT...SELECT` 引用新列，但旧表中该列不存在，导致失败。**应将 DEFAULT 变更和新增列分为两次独立的 push 操作。**
+- **一次性修复脚本：** `deploy/db-sync.js` 是修复历史数据库结构不一致的一次性工具。它手动重建所有表并处理缺失列（如 `providers.sort_order`），执行后 `pnpm db:push` 即为幂等操作。仅在已有数据库出现同步问题时使用。
+- **时间戳格式：** 所有 `created_at` / `updated_at` 列使用 `strftime('%Y-%m-%dT%H:%M:%fZ', 'now')` 生成 ISO 8601 毫秒精度时间。

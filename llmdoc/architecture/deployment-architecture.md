@@ -8,7 +8,8 @@
 ## 2. Core Components
 
 - `deploy/setup-ec2.sh` (`APP_DIR`, `SERVICE_NAME`, `RUN_USER`): 环境初始化脚本。检测 OS（Amazon Linux/Ubuntu/OpenCloudOS/CentOS）、安装 Node.js 24 + pnpm + Claude Code CLI、clone 仓库、写入 systemd unit 文件并 enable 服务。
-- `deploy/deploy.sh` (`APP_DIR`, `SERVICE_NAME`): 部署/更新脚本。7 步流程：git pull -> pnpm install -> pnpm build -> 复制静态资源到 standalone -> 创建数据目录 -> 数据库迁移 -> systemctl restart。
+- `deploy/deploy.sh` (`APP_DIR`, `SERVICE_NAME`): 部署/更新脚本。7 步流程：git pull -> pnpm install -> pnpm build -> 复制静态资源到 standalone -> 创建数据目录 -> db:push 数据库同步 -> systemctl restart。
+- `deploy/db-sync.js`: 一次性数据库结构修复脚本。手动重建所有表以对齐 schema.ts（处理缺失列和 DEFAULT 表达式变更），仅在已有数据库出现同步问题时使用。
 - `deploy/update-claude-code.sh`: Claude Code CLI 热更新脚本。npm update 全局包，无需重启服务。
 - `.env` (`AUTH_PASSWORD`, `AUTH_SECRET`): 应用环境变量文件，通过 systemd EnvironmentFile 指令注入到服务进程。
 - `/etc/systemd/system/claude-agent-manager.service`: systemd unit 文件，由 setup-ec2.sh 自动生成。
@@ -31,7 +32,7 @@
 - **3. 构建:** `deploy/deploy.sh:30` `pnpm build`（生成 `.next/standalone/`）。
 - **4. 复制静态资源:** `deploy/deploy.sh:33-34` 将 `.next/static` 复制到 `.next/standalone/.next/static`，将 `public` 复制到 `.next/standalone/public`。Next.js standalone 模式不自动包含静态资源，这是官方文档明确要求的必要步骤。
 - **5. 数据目录:** `deploy/deploy.sh:37` 确保 `data/` 和 `logs/` 目录存在。
-- **6. 数据库迁移:** `deploy/deploy.sh:40` 执行 `pnpm db:migrate`（即 `drizzle-kit migrate`），应用数据库 schema 变更。
+- **6. 数据库同步:** `deploy/deploy.sh:40` 执行 `pnpm db:push`（即 `drizzle-kit push --force`），声明式推送 schema 变更到数据库。与 `drizzle-kit migrate` 的区别：push 是无迁移文件的直接同步，适合单实例部署场景。注意 SQLite 限制：修改 DEFAULT 表达式会触发表重建，若同时新增列可能导致 push 失败（详见 `/llmdoc/reference/coding-conventions.md` 第 7 节）。
 - **7. 重启验证:** `deploy/deploy.sh:43-56` `systemctl restart` 后 3 秒检查服务状态。
 
 ### systemd 服务运行时
@@ -47,3 +48,5 @@
 - **EnvironmentFile 注入:** 敏感变量（API 密钥、认证密码）不写入 unit 文件，通过 `.env` 文件隔离，便于运维修改。
 - **无容器化:** 直接 systemd 管理 Node.js 进程，避免 Docker 额外开销，适合单机部署场景。
 - **CLI 热更新:** Claude Code CLI 作为全局 npm 包，更新后无需重启服务，下次 spawn 子进程时自动使用新版本。
+- **db:push 而非 migrate:** 使用 `drizzle-kit push --force` 而非迁移文件，因为单实例部署不需要迁移历史追踪。push 是声明式的（schema.ts 即真相），每次部署幂等执行。
+- **一次性修复工具:** `deploy/db-sync.js` 用于修复历史数据库与 schema.ts 的结构偏差（如缺失列、过时的 DEFAULT 表达式）。手动重建表并处理缺失列的 INSERT...SELECT，执行后 push 即为幂等。仅在已有数据库出现同步问题时使用。

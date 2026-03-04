@@ -13,9 +13,9 @@
    EOF
    ```
 
-3. **首次部署:** 执行 `bash deploy/deploy.sh`，脚本自动完成 7 步流程：git pull -> pnpm install -> build -> 复制静态资源到 standalone 目录 -> 创建数据目录 -> 数据库迁移（`pnpm db:migrate`，即 `drizzle-kit migrate`）-> restart。构建后脚本会将 `.next/static` 和 `public` 复制到 `.next/standalone/` 下（Next.js standalone 模式不自动包含静态资源，缺少此步骤会导致页面样式和静态文件 404）。部署成功后访问 `http://<server-ip>:3000`。
+3. **首次部署:** 执行 `bash deploy/deploy.sh`，脚本自动完成 7 步流程：git pull -> pnpm install -> build -> 复制静态资源到 standalone 目录 -> 创建数据目录 -> 数据库同步（`pnpm db:push`，即 `drizzle-kit push --force`）-> restart。构建后脚本会将 `.next/static` 和 `public` 复制到 `.next/standalone/` 下（Next.js standalone 模式不自动包含静态资源，缺少此步骤会导致页面样式和静态文件 404）。部署成功后访问 `http://<server-ip>:3000`。
 
-4. **更新应用代码:** 同样执行 `bash deploy/deploy.sh`，流程与首次部署一致（含静态资源复制和数据库迁移步骤）。参考 `deploy/deploy.sh`。
+4. **更新应用代码:** 同样执行 `bash deploy/deploy.sh`，流程与首次部署一致（含静态资源复制和数据库同步步骤）。参考 `deploy/deploy.sh`。
 
 5. **更新 Claude Code CLI:** 执行 `sudo bash deploy/update-claude-code.sh`。不需要重启服务，新版本在下次命令执行时自动生效。参考 `deploy/update-claude-code.sh`。
 
