@@ -2,11 +2,13 @@ import { db } from './db';
 import { config } from './schema';
 import { eq } from 'drizzle-orm';
 
-const CONFIG_DEFAULTS: Record<string, string> = {
+export const CONFIG_DEFAULTS: Record<string, string> = {
   max_concurrent: '2',
   command_timeout: '1800',
   log_retention_days: '30',
   poll_interval: '5',
+  max_autonomous_rounds: '20',
+  safety_net_delay_ms: '3000',
 };
 
 export const CONFIG_KEYS = Object.keys(CONFIG_DEFAULTS) as Array<keyof typeof CONFIG_DEFAULTS>;
