@@ -3,7 +3,7 @@
 # Claude Dispatch - 部署/更新脚本
 # 在 EC2 上运行，用于首次部署或后续更新
 #
-# 流程: git pull → pnpm install → pnpm build → 重启服务
+# 流程: git pull → pnpm install → pnpm build → 复制静态资源 → 重启服务
 # 直接在 clone 的仓库目录内构建和运行（standalone 模式）
 #
 # 用法: bash deploy/deploy.sh
@@ -20,19 +20,23 @@ echo "=== 部署 Claude Dispatch ==="
 echo "应用目录: $APP_DIR"
 cd "$APP_DIR"
 
-echo "[1/5] 拉取最新代码..."
+echo "[1/6] 拉取最新代码..."
 git pull origin main
 
-echo "[2/5] 安装依赖..."
+echo "[2/6] 安装依赖..."
 pnpm install --frozen-lockfile
 
-echo "[3/5] 构建应用..."
+echo "[3/6] 构建应用..."
 pnpm build
 
-echo "[4/5] 确保数据目录存在..."
+echo "[4/6] 复制静态资源到 standalone 目录..."
+cp -r .next/static .next/standalone/.next/static
+cp -r public .next/standalone/public
+
+echo "[5/6] 确保数据目录存在..."
 mkdir -p data logs
 
-echo "[5/5] 重启服务..."
+echo "[6/6] 重启服务..."
 sudo systemctl restart "$SERVICE_NAME"
 
 sleep 3

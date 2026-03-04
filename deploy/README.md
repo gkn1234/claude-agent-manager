@@ -140,6 +140,147 @@ ssh -L 1234:127.0.0.1:1234 root@118.25.103.212
 ssh -L 9990:127.0.0.1:9990 root@118.25.103.212
 ```
 
+#### 2.4 预装 Claude Code
+
+**环境变量注入：**
+
+修改 `~/.bashrc` 文件，添加：
+
+```bash
+# Claude Code API Router configuration
+export ANTHROPIC_BASE_URL="https://xxx"
+export ANTHROPIC_AUTH_TOKEN="xxx"
+```
+
+这样，我们自己远程上去也可以用 claude，可能帮助我们做系统运维
+
+**跳过 Claude 登录验证：**
+
+创建或打开 `~/.claude.json`
+
+确保文件中包含：
+
+```json
+{
+  "hasCompletedOnboarding": true
+}
+```
+
+> 如果文件已有其他内容，在第一层加上 `"hasCompletedOnboarding": true` 即可，不要覆盖已有字段。
+
+**Claude 基础配置：**
+
+编辑 `~/.claude/settings.json`：
+
+写入以下内容（替换 `<...>` 为你的实际值）：
+
+```json
+{
+  "env": {
+    "API_TIMEOUT_MS": "3000000",
+    "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
+    "CLAUDE_CODE_MAX_OUTPUT_TOKENS": "20000",
+    "DISABLE_TELEMETRY": "1",
+    "DISABLE_ERROR_REPORTING": "1",
+    "CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR": "1",
+    "MAX_THINKING_TOKENS": "12000"
+  },
+  "skipWebFetchPreflight": true,
+  "permissions": {},
+  "hooks": {},
+  "enabledPlugins": {}
+}
+```
+
+`permissions`、`hooks`、`enabledPlugins` 按照自己的实际需求设置
+
+#### 必要 Claude Code 插件(自用)
+
+**anthropics skills**
+
+https://github.com/anthropics/skills/blob/main/README.md
+
+```bash
+/plugin marketplace add anthropics/skills
+
+/plugin install document-skills@anthropic-agent-skills
+/plugin install example-skills@anthropic-agent-skills
+```
+
+**superpowers**
+
+https://github.com/obra/superpowers
+
+```bash
+/plugin marketplace add obra/superpowers-marketplace
+
+/plugin install superpowers@superpowers-marketplace
+```
+
+**claude-mem**
+
+通用记忆系统
+
+https://github.com/thedotmack/claude-mem
+
+```bash
+/plugin marketplace add thedotmack/claude-mem
+
+/plugin install claude-mem
+```
+
+**cc-plugin**
+
+以项目为单位，文档驱动的记忆系统
+
+https://github.com/TokenRollAI/cc-plugin
+
+```bash
+# Add TokenRoll plugin marketplace
+/plugin marketplace add https://github.com/TokenRollAI/cc-plugin
+
+# Install tr plugin
+/plugin install tr@cc-plugin
+```
+
+复制仓库中的 CLAUDE.md 内容到 `~/.claude` 下的同名文件
+
+**gh cli & 登录 github**
+
+安装 gh，并验证登录
+
+设置好 git 的登录身份：
+```bash
+git config --global user.name "xxx"
+git config --global user.email “yyy”
+```
+
+**playwright cli & 技能**
+
+```bash
+npm install -g @playwright/cli@latest
+```
+
+在 `~/.claude` 目录下安装技能
+
+```bash
+playwright-cli install --skills
+```
+
+**TypeScript LSP**
+
+```bash
+npm install -g typescript-language-server typescript
+```
+
+**官方技能**
+
+输入 `/plugin`，选择安装：
+- context7
+- frontend-design
+- typescript-lsp
+
+
 ### 3. 首次部署
 
 ```bash
