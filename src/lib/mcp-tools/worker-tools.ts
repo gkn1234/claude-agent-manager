@@ -1,6 +1,7 @@
 import { tasks, commands } from '../schema';
 import { eq } from 'drizzle-orm';
 import { v4 as uuid } from 'uuid';
+import { buildManagerReviewPrompt } from '../prompts';
 
 const MAX_AUTONOMOUS_ROUNDS = 20;
 
@@ -63,23 +64,4 @@ export function executeReportToManager(db: any, params: ReportParams): ReportRes
   }).run();
 
   return { ok: true, managerCommandCreated: true };
-}
-
-function buildManagerReviewPrompt(command: any, summary: string): string {
-  return `以下工作命令已完成，请审查结果并决定下一步。
-
-## Worker 报告
-${summary}
-
-## 命令信息
-- Prompt: ${command.prompt}
-- 状态: ${command.status}
-
-## 你的行动
-1. 审查结果是否符合预期
-2. 如果需要继续：通过 create_command 派发下一个工作命令
-3. 如果目标已达成：调用 complete_task
-4. 如果需要用户确认：调用 pause_task 并说明原因
-5. 如果命令失败：分析原因，决定重试或调整策略
-6. 每次回复结束前，你必须调用一个 MCP 工具`;
 }

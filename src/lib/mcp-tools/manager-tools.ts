@@ -1,16 +1,7 @@
 import { tasks, commands } from '../schema';
 import { eq } from 'drizzle-orm';
 import { v4 as uuid } from 'uuid';
-
-const WORKER_REPORT_INSTRUCTION = `
-
----
-
-完成工作后，使用 report_to_manager 工具向管理器报告：
-- 完成了什么
-- 结果如何
-- 是否遇到问题
-- 建议的下一步`;
+import { WORKER_REPORT_INSTRUCTION } from '../prompts';
 
 interface CreateCommandParams {
   taskId: string;
