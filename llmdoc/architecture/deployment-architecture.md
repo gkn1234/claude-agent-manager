@@ -29,8 +29,9 @@
 - **1. 代码同步:** `deploy/deploy.sh:24` `git pull origin main`。
 - **2. 依赖安装:** `deploy/deploy.sh:27` `pnpm install --frozen-lockfile`。
 - **3. 构建:** `deploy/deploy.sh:30` `pnpm build`（生成 `.next/standalone/`）。
-- **4. 数据目录:** `deploy/deploy.sh:33` 确保 `data/` 和 `logs/` 目录存在。
-- **5. 重启验证:** `deploy/deploy.sh:36-49` `systemctl restart` 后 3 秒检查服务状态。
+- **4. 复制静态资源:** `deploy/deploy.sh:33-34` 将 `.next/static` 复制到 `.next/standalone/.next/static`，将 `public` 复制到 `.next/standalone/public`。Next.js standalone 模式不自动包含静态资源，这是官方文档明确要求的必要步骤。
+- **5. 数据目录:** `deploy/deploy.sh:37` 确保 `data/` 和 `logs/` 目录存在。
+- **6. 重启验证:** `deploy/deploy.sh:40-53` `systemctl restart` 后 3 秒检查服务状态。
 
 ### systemd 服务运行时
 
@@ -41,7 +42,7 @@
 
 ## 4. Design Rationale
 
-- **standalone 模式:** Next.js `output: 'standalone'` 生成自包含的 `server.js`，无需 `node_modules`，部署体积小。
+- **standalone 模式:** Next.js `output: 'standalone'` 生成自包含的 `server.js`，无需 `node_modules`，部署体积小。standalone 模式不自动包含 `.next/static` 和 `public` 目录，构建后必须手动复制这些静态资源，否则页面 CSS/JS/图片等将 404。
 - **EnvironmentFile 注入:** 敏感变量（API 密钥、认证密码）不写入 unit 文件，通过 `.env` 文件隔离，便于运维修改。
 - **无容器化:** 直接 systemd 管理 Node.js 进程，避免 Docker 额外开销，适合单机部署场景。
 - **CLI 热更新:** Claude Code CLI 作为全局 npm 包，更新后无需重启服务，下次 spawn 子进程时自动使用新版本。
