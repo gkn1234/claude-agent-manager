@@ -6,8 +6,10 @@ import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowLeft, Trash2, Square, Undo2, Play } from 'lucide-react';
+import { ArrowLeft, Trash2, Square, Undo2, Play, Brain } from 'lucide-react';
+import { toast } from 'sonner';
 import { CommandInput } from '@/components/commands/command-input';
+import { AutonomousDialog } from '@/components/tasks/autonomous-dialog';
 
 interface Command {
   id: string;
@@ -144,6 +146,36 @@ export default function TaskPage() {
     fetchTask();
   };
 
+  const handlePauseAutonomous = async () => {
+    const res = await fetch(`/api/tasks/${taskId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'pause_autonomous' }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({ error: '请求失败' }));
+      toast.error(data.error || '暂停失败');
+      return;
+    }
+    toast.success('自主模式已暂停');
+    fetchTask();
+  };
+
+  const handleResumeAutonomous = async () => {
+    const res = await fetch(`/api/tasks/${taskId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'resume_autonomous' }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({ error: '请求失败' }));
+      toast.error(data.error || '恢复失败');
+      return;
+    }
+    toast.success('自主模式已恢复');
+    fetchTask();
+  };
+
   if (loading) return <div className="flex h-[50vh] items-center justify-center text-muted-foreground">加载中...</div>;
   if (!task) return <div className="flex h-[50vh] items-center justify-center text-muted-foreground">任务不存在</div>;
 
@@ -156,6 +188,34 @@ export default function TaskPage() {
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <span className="text-sm font-medium flex-1 truncate">{task.description}</span>
+          {task.mode === 'manual' && task.managerProviderId && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs gap-1"
+              onClick={handleResumeAutonomous}
+            >
+              <Brain className="h-3 w-3" />
+              恢复自主
+            </Button>
+          )}
+          {task.mode === 'manual' && !task.managerProviderId && (
+            <AutonomousDialog
+              taskId={taskId}
+              providers={providers}
+              onStarted={fetchTask}
+            />
+          )}
+          {task.mode === 'autonomous' && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs gap-1 text-orange-600 border-orange-300 hover:bg-orange-50"
+              onClick={handlePauseAutonomous}
+            >
+              暂停自主
+            </Button>
+          )}
           <Button variant="ghost" size="sm" className="p-1 text-destructive hover:text-destructive" onClick={handleDelete}>
             <Trash2 className="h-4 w-4" />
           </Button>
