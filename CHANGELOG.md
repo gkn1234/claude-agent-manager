@@ -1,5 +1,31 @@
 # Changelog
 
+## [1.0.1] - 2026-03-05
+
+### Features
+
+- 任务创建支持基准分支选择（`baseBranch` 参数，默认 main）
+- MCP `create_task` 工具同步支持 `baseBranch` 参数
+
+### Bug Fixes
+
+- 修复 git clone 同步阻塞服务器问题（改为异步 + 120s 超时 + 失败清理）
+- 修复 git clone 错误无友好提示问题（解析 stderr fatal 行返回 JSON 响应）
+- 修复部署流水线缺少数据库同步步骤（新增 db:push）
+- 修复部署脚本自更新导致执行中断（main() 函数包裹）
+
+### Refactoring
+
+- 抽取 `createTask()` 共享函数（`src/lib/tasks.ts`），REST API 和 MCP 工具复用
+- 登出按钮从导航迁移到设置页
+
+### Documentation
+
+- 新增 API 与 MCP 同步原则
+- 新增子进程执行规范（网络 git 操作必须异步 + 超时）
+- 新增数据库 schema 变更规范
+- deploy.sh 流水线升级为 7 步（含 db:push）
+
 ## [1.0.0] - 2026-03-04
 
 Claude Dispatch v1.0.0 首个正式版本发布。这是一个用于远程向 Claude Code CLI 进程派发任务的 Next.js 应用，具备实时监控、服务商配置、MCP 反馈循环和单密码认证保护。
