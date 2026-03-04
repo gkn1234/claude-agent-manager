@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
-import { Plus, Trash2, X, GripVertical, ChevronDown } from 'lucide-react';
+import { Plus, Trash2, X, GripVertical, ChevronDown, LogOut } from 'lucide-react';
 import {
   DndContext,
   closestCenter,
@@ -451,6 +451,21 @@ export default function SettingsPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* 退出登录 */}
+      <div className="mt-8 border-t pt-6">
+        <Button
+          variant="outline"
+          className="w-full text-muted-foreground hover:text-destructive hover:border-destructive"
+          onClick={async () => {
+            await fetch('/api/auth/logout', { method: 'POST' });
+            window.location.href = '/login';
+          }}
+        >
+          <LogOut className="h-4 w-4 mr-2" />
+          退出登录
+        </Button>
+      </div>
     </div>
   );
 }

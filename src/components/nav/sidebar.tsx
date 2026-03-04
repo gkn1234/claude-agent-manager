@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutList, FolderGit2, Settings, LogOut } from 'lucide-react';
+import { LayoutList, FolderGit2, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const navItems = [
@@ -10,11 +10,6 @@ const navItems = [
   { href: '/projects', label: '项目管理', icon: FolderGit2 },
   { href: '/settings', label: '系统设置', icon: Settings },
 ];
-
-async function handleLogout() {
-  await fetch('/api/auth/logout', { method: 'POST' });
-  window.location.href = '/login';
-}
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -44,15 +39,6 @@ export function Sidebar() {
           );
         })}
       </nav>
-      <div className="border-t px-2 py-2">
-        <button
-          onClick={handleLogout}
-          className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
-        >
-          <LogOut className="h-4 w-4" />
-          退出登录
-        </button>
-      </div>
     </aside>
   );
 }

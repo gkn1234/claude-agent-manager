@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutList, FolderGit2, Settings, LogOut } from 'lucide-react';
+import { LayoutList, FolderGit2, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const tabs = [
@@ -10,11 +10,6 @@ const tabs = [
   { href: '/projects', label: '项目', icon: FolderGit2 },
   { href: '/settings', label: '设置', icon: Settings },
 ];
-
-async function handleLogout() {
-  await fetch('/api/auth/logout', { method: 'POST' });
-  window.location.href = '/login';
-}
 
 export function BottomTabs() {
   const pathname = usePathname();
@@ -38,13 +33,6 @@ export function BottomTabs() {
             </Link>
           );
         })}
-        <button
-          onClick={handleLogout}
-          className="flex flex-col items-center gap-0.5 px-3 py-1 text-xs text-muted-foreground transition-colors"
-        >
-          <LogOut className="h-5 w-5" />
-          <span>退出</span>
-        </button>
       </div>
     </nav>
   );
