@@ -36,8 +36,8 @@ cp -r public .next/standalone/public
 echo "[5/7] 确保数据目录存在..."
 mkdir -p data logs
 
-echo "[6/7] 执行数据库迁移..."
-pnpm db:migrate
+echo "[6/7] 同步数据库结构..."
+pnpm db:push
 
 echo "[7/7] 重启服务..."
 sudo systemctl restart "$SERVICE_NAME"
