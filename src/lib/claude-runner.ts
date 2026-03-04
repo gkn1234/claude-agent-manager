@@ -1,10 +1,11 @@
 import { spawn, ChildProcess, execFileSync } from 'child_process';
-import { createWriteStream, mkdirSync, existsSync, unlinkSync, rmSync } from 'fs';
+import { createWriteStream, mkdirSync, existsSync, unlinkSync, rmSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { db } from './db';
 import { commands, tasks, projects, providers } from './schema';
 import { eq } from 'drizzle-orm';
 import { getConfig } from '@/lib/config';
+import { buildMcpUrl } from './mcp-tools';
 
 const LOG_DIR = process.env.LOG_DIR || './logs';
 
@@ -121,23 +122,39 @@ export async function runCommand(commandId: string): Promise<void> {
     args.push('--permission-mode', 'plan');
   }
 
-  // Inject MCP config if available — HTTP mode, no path resolution needed
-  const mcpConfigPath = join(process.cwd(), 'mcp-config.json');
-  if (existsSync(mcpConfigPath)) {
-    args.push('--mcp-config', mcpConfigPath);
-  }
+  // Generate role-contextualized MCP config for this command
+  const API_BASE = process.env.API_BASE || 'http://localhost:3000';
+  const mcpBaseUrl = `${API_BASE}/api/mcp`;
+  const mcpContext = {
+    role: (command.role || 'worker') as 'manager' | 'worker' | 'manual',
+    commandId: command.id,
+    taskId: command.taskId,
+  };
+  const mcpUrl = buildMcpUrl(mcpBaseUrl, mcpContext);
+  const tmpMcpConfig = join(LOG_DIR, `mcp-${commandId}.json`);
+  writeFileSync(tmpMcpConfig, JSON.stringify({
+    mcpServers: {
+      dispatch: { type: 'http', url: mcpUrl }
+    }
+  }, null, 2));
+  args.push('--mcp-config', tmpMcpConfig);
 
-  // Resume session if available
-  const prevCommand = db.select()
-    .from(commands)
-    .where(eq(commands.taskId, command.taskId))
-    .all()
-    .filter(c => c.sessionId && c.id !== commandId)
-    .sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''))
-    .pop();
+  // Resume session: manager uses task.managerSessionId, worker uses previous command's session
+  if (command.role === 'manager' && command.sessionId) {
+    // Manager commands created by report_to_manager already have sessionId set
+    args.push('--resume', command.sessionId);
+  } else {
+    const prevCommand = db.select()
+      .from(commands)
+      .where(eq(commands.taskId, command.taskId))
+      .all()
+      .filter(c => c.sessionId && c.id !== commandId)
+      .sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''))
+      .pop();
 
-  if (prevCommand?.sessionId) {
-    args.push('--resume', prevCommand.sessionId);
+    if (prevCommand?.sessionId) {
+      args.push('--resume', prevCommand.sessionId);
+    }
   }
 
   // Build spawn environment with provider injection
@@ -266,6 +283,9 @@ export async function runCommand(commandId: string): Promise<void> {
     logStream.end();
     runningProcesses.delete(commandId);
 
+    // Clean up temp MCP config
+    try { if (existsSync(tmpMcpConfig)) unlinkSync(tmpMcpConfig); } catch {}
+
     console.log(`[claude-runner] cmd=${commandId} process closed, code=${code}, lastResult_length=${lastResult.length}, allAssistantText_count=${allAssistantText.length}, permissionDenials_count=${permissionDenials.length}`);
 
     const finalStatus = code === 0 ? 'completed' : 'failed';
@@ -302,6 +322,14 @@ export async function runCommand(commandId: string): Promise<void> {
       pid: null,
       finishedAt: new Date().toISOString(),
     }).where(eq(commands.id, commandId)).run();
+
+    // For manager commands, save session ID back to task for future resume
+    if (command.role === 'manager' && sessionId) {
+      const currentTask = db.select().from(tasks).where(eq(tasks.id, command.taskId)).get();
+      if (currentTask && currentTask.managerSessionId !== sessionId) {
+        db.update(tasks).set({ managerSessionId: sessionId }).where(eq(tasks.id, command.taskId)).run();
+      }
+    }
 
   });
 
