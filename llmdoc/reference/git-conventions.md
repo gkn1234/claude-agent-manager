@@ -9,8 +9,8 @@
 ## 2. 分支策略
 
 - **主分支：** `main`（唯一分支，无远程功能分支）。
-- **任务隔离：** 使用 git 工作树代替功能分支。每个任务在 `<projectWorkDir>/.worktrees/<taskDir>` 处创建工作树。设计原理详见 `docs/initial-design.md`。
-- **工作树生命周期：** 在任务初始化时（通过 `/api/tasks/:id/init` 手动触发）创建，在任务或项目被删除时通过 `cleanupTask()` 删除。清理时也会删除工作树关联的分支（保护 main/master/develop）。
+- **任务隔离：** 使用 git 工作树代替功能分支。每个任务在 `<projectWorkDir>/.worktrees/<taskDir>` 处创建工作树。新分支基于指定的基准分支（`baseBranch`）创建，默认为 `main`。API 在创建前验证基准分支存在性。设计原理详见 `docs/initial-design.md`。
+- **工作树生命周期：** 在任务创建时原子生成（`git worktree add <dir> -b <branch> <baseBranch>`），在任务或项目被删除时通过 `cleanupTask()` 删除。清理时也会删除工作树关联的分支（保护 main/master/develop）。
 
 ## 3. 提交消息格式
 

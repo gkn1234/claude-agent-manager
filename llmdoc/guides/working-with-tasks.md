@@ -4,7 +4,7 @@
 
 ## 任务生命周期
 
-1. **创建任务：** `POST /api/projects/{projectId}/tasks`，携带 `{ "description": "...", "branch": "my-branch" }`。`branch` 为选填，不填则自动生成 `task-{uuid前缀}`，仅允许 `[a-z0-9-]`。创建时同步生成 git branch + worktree，如果失败则不创建任务。参见 `src/app/api/projects/[id]/tasks/route.ts`。
+1. **创建任务：** `POST /api/projects/{projectId}/tasks`，携带 `{ "description": "...", "branch": "my-branch", "baseBranch": "dev" }`。`branch` 为选填，不填则自动生成 `task-{uuid前缀}`，仅允许 `[a-z0-9-]`。`baseBranch` 为选填，指定新分支的起始点（start-point），不填默认为 `main`；API 会验证基准分支存在性。创建时同步生成 git branch + worktree（`git worktree add <dir> -b <branch> <baseBranch>`），如果失败则不创建任务。参见 `src/app/api/projects/[id]/tasks/route.ts`。
 
 2. **添加命令：** `POST /api/tasks/{taskId}/commands`，携带 `{ "prompt": "...", "mode": "execute"|"plan", "providerId": "..." }`。服务商必填。使用 `autoQueue=true`（默认）时立即排队；`autoQueue=false` 创建草稿。草稿创建不受运行中命令限制。参见 `src/app/api/tasks/[id]/commands/route.ts`。
 

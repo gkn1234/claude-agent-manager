@@ -19,6 +19,7 @@ export function CreateTaskDialog({ projectId, onCreated }: CreateTaskDialogProps
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
   const [branch, setBranch] = useState('');
+  const [baseBranch, setBaseBranch] = useState('');
   const [loading, setLoading] = useState(false);
 
   const branchValid = BRANCH_REGEX.test(branch);
@@ -31,12 +32,13 @@ export function CreateTaskDialog({ projectId, onCreated }: CreateTaskDialogProps
       const res = await fetch(`/api/projects/${projectId}/tasks`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ description: name.trim(), branch: branch.trim() || undefined }),
+        body: JSON.stringify({ description: name.trim(), branch: branch.trim() || undefined, baseBranch: baseBranch.trim() || undefined }),
       });
       if (res.ok) {
         setOpen(false);
         setName('');
         setBranch('');
+        setBaseBranch('');
         onCreated();
       } else {
         const data = await res.json().catch(() => ({ error: '创建失败' }));
@@ -64,6 +66,16 @@ export function CreateTaskDialog({ projectId, onCreated }: CreateTaskDialogProps
               placeholder="输入任务名称"
               value={name}
               onChange={(e) => setName(e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="task-base-branch">基准分支（选填）</Label>
+            <Input
+              id="task-base-branch"
+              placeholder="默认为 main"
+              value={baseBranch}
+              onChange={(e) => setBaseBranch(e.target.value)}
+              className="font-mono"
             />
           </div>
           <div className="space-y-2">
