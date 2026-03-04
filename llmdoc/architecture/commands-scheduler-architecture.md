@@ -11,7 +11,7 @@
 - `src/lib/scheduler.ts`（`startScheduler`、`stopScheduler`、`tick`、`recoverOrphanedCommands`）：基于轮询的调度器。每个 tick 从数据库读取排队命令，强制执行每任务串行和全局并发限制，然后分发给 runner。
 - `src/lib/claude-runner.ts`（`runCommand`、`cleanupTask`、`runningProcesses`、`RunningProcess`）：以子进程形式生成注入了服务商环境变量的 `claude` CLI，解析 NDJSON stdout 流获取 session_id/助手文本/result/permission_denials，处理超时，记录 `execEnv` 审计对象，将终态写回数据库。将所有助手文本块累积到 `allAssistantText[]` 以实现完整结果捕获。提取 `AskUserQuestion` 权限拒绝，并以格式化 markdown 追加到命令结果中。
 - `src/lib/init.ts`（`ensureInitialized`）：懒加载单例守卫，在首次 HTTP 请求时启动调度器。
-- `src/lib/config.ts`（`getConfig`、`CONFIG_KEYS`）：从数据库配置表读取 `max_concurrent`、`command_timeout`、`poll_interval`，带默认值。
+- `src/lib/config.ts`（`getConfig`、`CONFIG_KEYS`）：从数据库配置表读取 `max_concurrent`、`command_timeout`、`poll_interval`，带默认值。**关键原则：** 运行时可调参数必须通过 `getConfig()` 读取（非 `process.env`），确保 Settings UI 修改实时生效。详见 `/llmdoc/reference/config-keys.md`。
 - `src/app/api/commands/[id]/route.ts`（`GET`、`PATCH`、`DELETE`）：GET 返回命令详情，附带任务上下文字段（`taskLastProviderId`、`taskLastMode`、`isLatestFinished`、`hasRunning`），供内联命令输入区使用。PATCH 通过 `VALID_TRANSITIONS` 映射表强制状态机转换；当命令为 pending 状态时，也允许编辑 prompt、mode、providerId。处理 abort 时发送 SIGTERM/SIGKILL。DELETE 仅移除 pending 状态的命令。
 - `src/app/api/tasks/[id]/commands/route.ts`（`POST`）：创建命令，需要 `providerId`。无状态门控（任务无 status 字段）。运行中命令检查（409）仅在 `autoQueue=true` 时生效；草稿（pending）创建始终允许。支持 `autoQueue` 标志。
 - `src/app/api/commands/reorder/route.ts`（`PATCH`）：批量更新多条命令的 priority 字段。
