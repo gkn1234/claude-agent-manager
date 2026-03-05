@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.0.2] - 2026-03-05
+
+### Features
+
+- 新增 `/release` 发布命令，标准化版本发布流程（CHANGELOG 生成、tag、GitHub Release）
+
+### Bug Fixes
+
+- 修复新建项目后无法创建任务的问题（`gitInit` 现在自动创建 initial commit，确保 main 分支立即存在）
+- 修复 clone 项目后无法选择远程分支作为基准分支的问题（基准分支验证增加远程跟踪分支检查）
+- 新增空仓库防御性检测，给出友好错误提示
+- 修复部署脚本 sudo 环境变量传递问题
+
+### Documentation
+
+- 部署 README 增加 root 使用警告和代理配置说明
+- 新增自治任务管理器设计文档
+- 清理 v1.0 阶段旧设计文档
+- 同步更新 llmdoc 文档（任务创建流程、项目架构）
+
 ## [1.0.1] - 2026-03-05
 
 ### Features
