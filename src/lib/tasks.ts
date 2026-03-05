@@ -39,11 +39,23 @@ export function createTask(params: CreateTaskParams): CreateTaskResult {
     return { ok: false, error: '分支名仅允许小写字母、数字和连字符', code: 'validation' };
   }
 
-  // Check base branch exists
+  // Check repo has at least one commit
   try {
-    const baseExists = execFileSync('git', ['-C', project.workDir, 'branch', '--list', baseBranch], { encoding: 'utf-8' }).trim();
-    if (!baseExists) {
-      return { ok: false, error: `基准分支 "${baseBranch}" 不存在`, code: 'validation' };
+    execFileSync('git', ['-C', project.workDir, 'rev-parse', '--verify', 'HEAD'], { encoding: 'utf-8' });
+  } catch {
+    return { ok: false, error: '仓库尚无任何提交，请先在仓库中创建至少一次提交', code: 'validation' };
+  }
+
+  // Check base branch exists (local or remote tracking)
+  let resolvedBaseBranch = baseBranch;
+  try {
+    const localExists = execFileSync('git', ['-C', project.workDir, 'branch', '--list', baseBranch], { encoding: 'utf-8' }).trim();
+    if (!localExists) {
+      const remoteExists = execFileSync('git', ['-C', project.workDir, 'branch', '-r', '--list', `origin/${baseBranch}`], { encoding: 'utf-8' }).trim();
+      if (!remoteExists) {
+        return { ok: false, error: `基准分支 "${baseBranch}" 不存在`, code: 'validation' };
+      }
+      resolvedBaseBranch = `origin/${baseBranch}`;
     }
   } catch (e) {
     return { ok: false, error: `检查基准分支失败: ${(e as Error).message}`, code: 'internal' };
@@ -68,7 +80,7 @@ export function createTask(params: CreateTaskParams): CreateTaskResult {
   // Atomic: create branch + worktree
   const worktreeDir = join(worktreesBase, branch);
   try {
-    execFileSync('git', ['-C', project.workDir, 'worktree', 'add', worktreeDir, '-b', branch, baseBranch], { encoding: 'utf-8' });
+    execFileSync('git', ['-C', project.workDir, 'worktree', 'add', worktreeDir, '-b', branch, resolvedBaseBranch], { encoding: 'utf-8' });
   } catch (e) {
     return { ok: false, error: `创建 worktree 失败: ${(e as Error).message}`, code: 'internal' };
   }

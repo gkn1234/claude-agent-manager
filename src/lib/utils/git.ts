@@ -40,6 +40,8 @@ export async function gitClone(url: string, targetDir: string): Promise<void> {
 
 export function gitInit(dir: string): void {
   execFileSync('git', ['init'], { cwd: dir, encoding: 'utf-8' });
+  execFileSync('git', ['checkout', '-b', 'main'], { cwd: dir, encoding: 'utf-8' });
+  execFileSync('git', ['commit', '--allow-empty', '-m', 'Initial commit'], { cwd: dir, encoding: 'utf-8' });
 }
 
 export function ensureGitignoreEntry(dir: string, entry: string): void {

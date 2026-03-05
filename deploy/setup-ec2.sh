@@ -9,10 +9,14 @@
 
 set -euo pipefail
 
-APP_DIR="${1:-$HOME/claude-agent-manager-source}"
+# 确保 /usr/local/bin 在 PATH 中（sudo 环境下可能缺失）
+export PATH="/usr/local/bin:$PATH"
+
 REPO_URL="https://github.com/gkn1234/claude-agent-manager.git"
 SERVICE_NAME="claude-agent-manager"
-RUN_USER="$(logname 2>/dev/null || echo "$SUDO_USER" || echo "$USER")"
+RUN_USER="$(logname 2>/dev/null || echo "${SUDO_USER:-$USER}")"
+RUN_USER_HOME=$(eval echo "~$RUN_USER")
+APP_DIR="${1:-$RUN_USER_HOME/claude-agent-manager-source}"
 
 echo "=== Claude Dispatch 环境初始化 ==="
 echo "应用目录: $APP_DIR"

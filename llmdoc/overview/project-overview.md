@@ -42,7 +42,7 @@ Claude Dispatch 是一个基于三层实体层级构建的任务编排系统：*
 
 **服务商配置文件（Provider Profiles）：** `src/lib/schema.ts`（`providers`）存储带自由格式环境键值对的命名配置。所有命令都必须有服务商——不存在默认环境变量兜底。Runner 在生成 CLI 之前清除冲突的环境变量，然后注入服务商的 `envJson`。
 
-**原子任务创建：** 任务创建时同步执行 git branch + worktree 创建。如果 branch/worktree 创建失败，任务不会被插入数据库。分支名可选填，不填则自动生成 `task-{uuid前缀}`，仅允许 `[a-z0-9-]` 字符。任务创建后即可接受命令，无需初始化流程。
+**原子任务创建：** 任务创建时同步执行 git branch + worktree 创建。如果 branch/worktree 创建失败，任务不会被插入数据库。分支名可选填，不填则自动生成 `task-{uuid前缀}`，仅允许 `[a-z0-9-]` 字符。创建前进行空仓库检测（`git rev-parse --verify HEAD`）和基准分支验证（先查本地、再查远程跟踪分支）。任务创建后即可接受命令，无需初始化流程。
 
 **调度器轮询循环：** `src/lib/scheduler.ts`（`tick`）每隔 N 秒轮询数据库查找 `queued` 状态的命令，遵守 `max_concurrent` 限制和每任务串行执行约束。通过 `src/lib/init.ts` 在首次 HTTP 请求时懒加载初始化。
 

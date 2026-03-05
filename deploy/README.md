@@ -28,6 +28,8 @@
 
 ### 2. 环境初始化（只需执行一次）
 
+注意，千万不要在 root 下执行，本程序禁止在 root 下使用
+
 ```bash
 # 下载安装脚本（或 scp 上传）
 curl -O https://raw.githubusercontent.com/gkn1234/claude-agent-manager/main/deploy/setup-ec2.sh
@@ -43,6 +45,13 @@ sudo bash setup-ec2.sh /opt/my-app
 - 安装 Node.js 24、pnpm、Git、Claude Code CLI
 - Clone 仓库到指定目录
 - 配置 systemd 服务（开机自启）
+
+如果你的服务需要翻墙，请在 `/etc/systemd/system/claude-agent-manager.service` 中添加(需要 root 权限)：
+```
+Environment=http_proxy=http://127.0.0.1:7890
+Environment=https_proxy=http://127.0.0.1:7890
+Environment=all_proxy=socks5://127.0.0.1:7890
+```
 
 #### 2.1 前置准备：Clash 安装
 不能科学上网，相当于 Claude 被切断了双臂，因此一定要先解决科学上网问题
