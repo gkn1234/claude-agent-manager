@@ -8,7 +8,7 @@
 ## 2. 核心组件
 
 - `src/lib/schema.ts`（`tasks`、`commands`、`tasksRelations`）：定义任务和命令表。任务无 `status` 字段，`branch` 为 `notNull()`。保留 `lastProviderId`、`lastMode` 作为偏好记忆字段。
-- `src/lib/tasks.ts`（`createTask`、`CreateTaskParams`、`CreateTaskResult`）：任务创建的共享核心逻辑。接受 `{ projectId, description, branch?, baseBranch? }`，执行完整创建流程（项目查找、分支名处理、baseBranch 验证、分支冲突检查、worktree 创建、DB 插入）。返回 Result 类型：`{ ok: true, task }` 或 `{ ok: false, error, code }`，code 为 `'not_found' | 'validation' | 'conflict' | 'internal'`。被 REST API 和 MCP `create_task` 工具共同调用。
+- `src/lib/tasks.ts`（`createTask`、`CreateTaskParams`、`CreateTaskResult`）：任务创建的共享核心逻辑。接受 `{ projectId, description, branch?, baseBranch? }`，执行完整创建流程（项目查找、分支名处理、空仓库检测、baseBranch 验证（本地+远程）、分支冲突检查、worktree 创建、DB 插入）。空仓库检测通过 `git rev-parse --verify HEAD` 实现，在无提交时返回友好错误。基准分支验证先查本地分支，不存在再查远程跟踪分支（`origin/<baseBranch>`），引入 `resolvedBaseBranch` 变量用于 worktree 创建时的起始点。返回 Result 类型：`{ ok: true, task }` 或 `{ ok: false, error, code }`，code 为 `'not_found' | 'validation' | 'conflict' | 'internal'`。被 REST API 和 MCP `create_task` 工具共同调用。
 - `src/app/api/projects/[id]/tasks/route.ts`（`POST`）：REST API 薄层，调用 `createTask()` 共享函数并将 error code 映射为 HTTP 状态码（not_found→404, validation→400, conflict→409, internal→500）。
 - `src/app/api/tasks/route.ts`（`GET`）：列出任务，支持 `?project_id=` 过滤。
 - `src/app/api/tasks/[id]/route.ts`（`GET`、`PATCH`、`DELETE`）：获取任务及其命令；更新 `lastProviderId`/`lastMode` 偏好设置；通过 `cleanupTask()` 删除任务。
@@ -26,11 +26,12 @@
 - **1. 入口调用：** REST API（`src/app/api/projects/[id]/tasks/route.ts:11-22`）或 MCP `create_task` 工具（`src/app/api/mcp/route.ts:29-35`）调用共享函数 `createTask()` -- `src/lib/tasks.ts:22-87`。
 - **2. 项目查找：** 查询数据库确认项目存在，不存在返回 `not_found` -- `src/lib/tasks.ts:25-28`。
 - **3. 分支名处理：** 若未提供分支名，自动生成 `task-{uuid前缀}`。验证分支名格式 `[a-z0-9-]`。解析 `baseBranch`，不填默认为 `main` -- `src/lib/tasks.ts:34-40`。
-- **4. 基准分支验证：** 通过 `git -C <workDir> branch --list <baseBranch>` 检查基准分支是否存在，不存在返回 `validation` -- `src/lib/tasks.ts:43-50`。
-- **5. 分支冲突检查：** 通过 `git -C <workDir> branch --list <branch>` 检查分支是否已存在，存在则返回 `conflict` -- `src/lib/tasks.ts:53-60`。
-- **6. 创建 worktree：** 确保 `.worktrees/` 目录存在，执行 `git worktree add <dir> -b <branch> <baseBranch>` -- `src/lib/tasks.ts:63-74`。
-- **7. 插入数据库：** worktree 创建成功后插入任务记录（含 branch、worktreeDir）-- `src/lib/tasks.ts:77-83`。
-- **8. 调用方映射：** REST API 将 error code 映射为 HTTP 状态码（`src/app/api/projects/[id]/tasks/route.ts:4-9`）；MCP 将错误映射为 `isError: true` 格式（`src/app/api/mcp/route.ts:31-32`）。
+- **4. 空仓库检测（防御性编程）：** 通过 `git -C <workDir> rev-parse --verify HEAD` 检查仓库是否有至少一次提交，无提交时返回 `validation` 错误："仓库尚无任何提交，请先在仓库中创建至少一次提交" -- `src/lib/tasks.ts:42-47`。
+- **5. 基准分支验证（本地+远程）：** 先通过 `git -C <workDir> branch --list <baseBranch>` 检查本地分支；本地不存在时，再通过 `git -C <workDir> branch -r --list origin/<baseBranch>` 检查远程跟踪分支。两者都不存在则返回 `validation`。若仅存在于远程，设置 `resolvedBaseBranch = origin/<baseBranch>`，供后续 worktree 创建使用 -- `src/lib/tasks.ts:49-62`。
+- **6. 分支冲突检查：** 通过 `git -C <workDir> branch --list <branch>` 检查分支是否已存在，存在则返回 `conflict` -- `src/lib/tasks.ts:64-72`。
+- **7. 创建 worktree：** 确保 `.worktrees/` 目录存在，执行 `git worktree add <dir> -b <branch> <resolvedBaseBranch>`（注意使用 `resolvedBaseBranch` 而非原始 `baseBranch`）-- `src/lib/tasks.ts:74-86`。
+- **8. 插入数据库：** worktree 创建成功后插入任务记录（含 branch、worktreeDir）-- `src/lib/tasks.ts:88-98`。
+- **9. 调用方映射：** REST API 将 error code 映射为 HTTP 状态码（`src/app/api/projects/[id]/tasks/route.ts:4-9`）；MCP 将错误映射为 `isError: true` 格式（`src/app/api/mcp/route.ts:31-32`）。
 
 ### 向任务添加命令
 
