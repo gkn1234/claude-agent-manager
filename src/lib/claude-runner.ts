@@ -1,6 +1,6 @@
 import { spawn, ChildProcess, execFileSync } from 'child_process';
 import { createWriteStream, mkdirSync, existsSync, unlinkSync, rmSync, writeFileSync } from 'fs';
-import { join } from 'path';
+import { join, resolve } from 'path';
 import { db } from './db';
 import { commands, tasks, projects, providers } from './schema';
 import { eq } from 'drizzle-orm';
@@ -8,7 +8,7 @@ import { getConfig } from '@/lib/config';
 import { buildMcpUrl } from './mcp-tools';
 import { checkAndRecoverAutonomousTask } from './safety-net';
 
-const LOG_DIR = process.env.LOG_DIR || './logs';
+const LOG_DIR = resolve(process.env.LOG_DIR || './logs');
 
 export interface RunningProcess {
   pid: number;
@@ -167,6 +167,16 @@ export async function runCommand(commandId: string): Promise<void> {
   ];
 
   const spawnEnv = { ...process.env };
+
+  // Strip Claude Code internal env vars to prevent "nested session" detection
+  // These leak when the Next.js server is started from within a Claude Code session
+  delete spawnEnv.CLAUDECODE;
+  delete spawnEnv.CLAUDE_CODE_SSE_PORT;
+  delete spawnEnv.CLAUDE_CODE_ENTRYPOINT;
+  delete spawnEnv.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC;
+  delete spawnEnv.CLAUDE_CODE_MAX_OUTPUT_TOKENS;
+  delete spawnEnv.CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR;
+
   let providerName: string | null = null;
 
   if (command.providerId) {

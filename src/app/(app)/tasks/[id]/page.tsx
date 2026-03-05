@@ -188,7 +188,7 @@ export default function TaskPage() {
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <span className="text-sm font-medium flex-1 truncate">{task.description}</span>
-          {task.mode === 'manual' && task.managerProviderId && (
+          {task.mode !== 'autonomous' && task.managerProviderId && (
             <Button
               variant="outline"
               size="sm"
@@ -199,7 +199,7 @@ export default function TaskPage() {
               恢复自主
             </Button>
           )}
-          {task.mode === 'manual' && !task.managerProviderId && (
+          {task.mode !== 'autonomous' && !task.managerProviderId && (
             <AutonomousDialog
               taskId={taskId}
               providers={providers}
